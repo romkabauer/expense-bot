@@ -94,3 +94,13 @@ class BaseHandler:
                                              f"Data to be recorded: \n"
                                              f"{json.dumps(form_payload, sort_keys=True, indent=4)}",
                                         disable_notification=True)
+
+    @staticmethod
+    async def convert_to_try(amount_with_currency: str):
+        if any([cur in amount_with_currency.lower() for cur in ['usd', 'eur']]):
+            source_currency = amount_with_currency.split(' ')[1]
+            res = r.get(url=f"https://cdn.jsdelivr.net/gh/fawazahmed0/currency-api@1/latest/currencies"
+                            f"/{source_currency.lower()}"
+                            f"/try.min.json")
+            return round(float(amount_with_currency.split(' ')[0]) * res.json().get("try"), 2)
+        return amount_with_currency

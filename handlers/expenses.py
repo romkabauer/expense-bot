@@ -82,7 +82,11 @@ class AskAmount(BaseHandler):
 
         await self.fill_payload_field(field_key="category", value=callback.data, state=state)
 
-        msg = await callback.message.reply("💵What is an amount paid?",
+        msg = await callback.message.reply("💵What is an amount paid (default - TRY, available - USD, EUR)?\n"
+                                           "Examples:\n"
+                                           "\t'100' - 100 TRY will be recorded\n"
+                                           "\t'10 USD' - amount will be recorded in TRY "
+                                           "with conversion rate on the current date",
                                            reply=False,
                                            disable_notification=True)
         await self.save_init_instruction_msg_id(msg, state)
@@ -95,10 +99,11 @@ class ParseAmount(BaseHandler):
         await message.delete()
         await self.delete_init_instruction(chat_id=message.chat.id, state=state)
 
-        if not re.match(r"\d+([.,]\d+)?", message.text):
+        if not re.match(r"^\d+([.,]\d+)?( USD|EUR|TRY|RUB|usd|eur|try|rub)?$", message.text):
             msg = await message.reply(text=f"⛔️Wrong format for spending amount.\n"
                                            f"🔤Should contain only positive numbers "
-                                           f"possibly with . or , decimal separator:",
+                                           f"possibly with . or , decimal separator "
+                                           f"and USD, EUR, TRY, RUB, usd, eur, rub or try as currency label:",
                                       reply=False,
                                       disable_notification=True)
             await self.save_init_instruction_msg_id(msg, state)
@@ -110,7 +115,7 @@ class ParseAmount(BaseHandler):
                                   disable_notification=True)
         await self.save_init_instruction_msg_id(msg, state)
 
-        await self.fill_payload_field(field_key="amount", value=message.text, state=state)
+        await self.fill_payload_field(field_key="amount", value=await self.convert_to_try(message.text), state=state)
 
 
 class InputComment(BaseHandler):
