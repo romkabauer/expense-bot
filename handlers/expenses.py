@@ -28,7 +28,8 @@ class InputDate(BaseHandler):
         if callback.data in ["today", "yesterday"]:
             msg = await callback.message.reply("What is the expense category?",
                                                reply_markup=build_listlike_keyboard(
-                                                   entities=self.config.get('spending_categories')),
+                                                   entities=self.config.get('spending_categories'),
+                                                   max_items_in_a_row=3),
                                                reply=False,
                                                disable_notification=True)
             async with state.proxy() as data:
@@ -183,11 +184,13 @@ class InputComment(BaseHandler):
             if res.status_code == 200:
                 await callback.message.reply(text=f"Expense has been recorded!\n"
                                                   f"Recorded data: "
-                                                  f"{json.dumps(form_payload, sort_keys=True, indent=4)}")
+                                                  f"{json.dumps(form_payload, sort_keys=True, indent=4)}",
+                                             disable_notification=True)
             else:
                 await callback.message.reply(text=f"NOT recorded!\n"
                                                   f"Data to be recorded: "
-                                                  f"{json.dumps(form_payload, sort_keys=True, indent=4)}")
+                                                  f"{json.dumps(form_payload, sort_keys=True, indent=4)}",
+                                             disable_notification=True)
             await callback.message.delete()
             await state.finish()
 
@@ -209,11 +212,13 @@ class ParseComment(BaseHandler):
         if res.status_code == 200:
             await message.reply(text=f"Expense has been recorded!\n"
                                      f"Recorded data: "
-                                     f"{json.dumps(form_payload, sort_keys=True, indent=4)}")
+                                     f"{json.dumps(form_payload, sort_keys=True, indent=4)}",
+                                disable_notification=True)
         else:
             await message.reply(text=f"NOT recorded!\n"
                                      f"Data to be recorded: "
-                                     f"{json.dumps(form_payload, sort_keys=True, indent=4)}")
+                                     f"{json.dumps(form_payload, sort_keys=True, indent=4)}",
+                                disable_notification=True)
 
         await message.delete()
         await state.finish()
