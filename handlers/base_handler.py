@@ -97,7 +97,7 @@ class BaseHandler:
 
     @staticmethod
     async def convert_to_try(amount_with_currency: str):
-        if any([cur in amount_with_currency.lower() for cur in ['usd', 'eur']]):
+        if any([cur in amount_with_currency.lower() for cur in ['usd', 'eur', 'rub']]):
             source_currency = amount_with_currency.split(' ')[1]
             res = r.get(url=f"https://cdn.jsdelivr.net/gh/fawazahmed0/currency-api@1/latest/currencies"
                             f"/{source_currency.lower()}"
