@@ -12,7 +12,7 @@ from resources.form_sender import get_default_form_payload
 
 class StartAddingExpense(BaseHandler):
     async def __call__(self, message: types.Message, state: FSMContext):
-        msg = await message.reply("When did you spend?",
+        msg = await message.reply("📅When did you spend?",
                                   reply_markup=build_date_keyboard(),
                                   reply=False,
                                   disable_notification=True)
@@ -26,7 +26,7 @@ class InputDate(BaseHandler):
         await callback.answer()
 
         if callback.data in ["today", "yesterday"]:
-            msg = await callback.message.reply("What is the expense category?",
+            msg = await callback.message.reply("🛍️What is the expense category?",
                                                reply_markup=build_listlike_keyboard(
                                                    entities=self.config.get('spending_categories'),
                                                    max_items_in_a_row=3),
@@ -48,7 +48,7 @@ class InputDate(BaseHandler):
                 data["form_payload"][day_key] = dt.now().day if callback.data == "today" \
                     else (dt.now() - td(1)).day
         else:
-            msg = await callback.message.reply("Input expense date in format '2023-10-13':",
+            msg = await callback.message.reply("🔤Input expense date in format '2023-10-13':",
                                                reply=False,
                                                disable_notification=True)
             async with state.proxy() as data:
@@ -68,8 +68,8 @@ class ParseDate(BaseHandler):
             await self.bot.delete_message(chat_id=message.chat.id,
                                           message_id=init_msg_to_delete)
 
-            msg = await message.reply(text=f"Wrong date format.\n"
-                                           f"Input expense date in format '2023-10-13':",
+            msg = await message.reply(text=f"⛔️Wrong date format.\n"
+                                           f"🔤Input expense date in format '2023-10-13':",
                                       reply=False,
                                       disable_notification=True)
             async with state.proxy() as data:
@@ -79,8 +79,8 @@ class ParseDate(BaseHandler):
             await self.bot.delete_message(chat_id=message.chat.id,
                                           message_id=init_msg_to_delete)
 
-            msg = await message.reply(text=f"Input cannot contain future dates.\n"
-                                           f"Input expense date in format '2023-10-13':",
+            msg = await message.reply(text=f"⛔️Input cannot contain future dates.\n"
+                                           f"🔤Input expense date in format '2023-10-13':",
                                       reply=False,
                                       disable_notification=True)
             async with state.proxy() as data:
@@ -90,7 +90,7 @@ class ParseDate(BaseHandler):
         await self.bot.delete_message(chat_id=message.chat.id,
                                       message_id=init_msg_to_delete)
 
-        msg = await message.reply("What is the expense category?",
+        msg = await message.reply("🛍️What is the expense category?",
                                   reply_markup=build_listlike_keyboard(self.config.get('spending_categories')),
                                   reply=False,
                                   disable_notification=True)
@@ -114,7 +114,7 @@ class AskAmount(BaseHandler):
         await callback.answer()
         await callback.message.delete()
 
-        msg = await callback.message.reply("What is an amount paid?",
+        msg = await callback.message.reply("💵What is an amount paid?",
                                            reply=False,
                                            disable_notification=True)
         async with state.proxy() as data:
@@ -140,15 +140,15 @@ class ParseAmount(BaseHandler):
                                       message_id=init_msg_to_delete)
 
         if not re.match(r"\d+([.,]\d+)?", message.text):
-            msg = await message.reply(text=f"Wrong format for spending amount.\n"
-                                           f"Should contain only numbers possibly with . or , decimal separator:",
+            msg = await message.reply(text=f"⛔️Wrong format for spending amount.\n"
+                                           f"🔤Should contain only numbers possibly with . or , decimal separator:",
                                       reply=False,
                                       disable_notification=True)
             async with state.proxy() as data:
                 data['init_instruction'] = msg["message_id"]
             return
 
-        msg = await message.reply(text=f"Choose any comment to add or choose 'Custom comment' and write custom one:",
+        msg = await message.reply(text=f"🔤Choose any comment to add or choose 'Custom comment' and write custom one:",
                                   reply_markup=build_listlike_keyboard(self.config.get("comments")),
                                   reply=False,
                                   disable_notification=True)
@@ -166,7 +166,7 @@ class InputComment(BaseHandler):
         form_payload = ""
 
         if callback.data == "Custom comment":
-            msg = await callback.message.reply("Input your comment:",
+            msg = await callback.message.reply("🔤Input your comment:",
                                                reply=False,
                                                disable_notification=True)
             await callback.message.delete()
@@ -182,12 +182,12 @@ class InputComment(BaseHandler):
 
             res = r.post(self.config.get("form_url"), data=form_payload)
             if res.status_code == 200:
-                await callback.message.reply(text=f"Expense has been recorded!\n"
+                await callback.message.reply(text=f"✅Expense has been recorded!\n"
                                                   f"Recorded data: "
                                                   f"{json.dumps(form_payload, sort_keys=True, indent=4)}",
                                              disable_notification=True)
             else:
-                await callback.message.reply(text=f"NOT recorded!\n"
+                await callback.message.reply(text=f"⛔️NOT recorded!\n"
                                                   f"Data to be recorded: "
                                                   f"{json.dumps(form_payload, sort_keys=True, indent=4)}",
                                              disable_notification=True)
@@ -210,12 +210,12 @@ class ParseComment(BaseHandler):
 
         res = r.post(self.config.get("form_url"), data=form_payload)
         if res.status_code == 200:
-            await message.reply(text=f"Expense has been recorded!\n"
+            await message.reply(text=f"✅Expense has been recorded!\n"
                                      f"Recorded data: "
                                      f"{json.dumps(form_payload, sort_keys=True, indent=4)}",
                                 disable_notification=True)
         else:
-            await message.reply(text=f"NOT recorded!\n"
+            await message.reply(text=f"⛔️NOT recorded!\n"
                                      f"Data to be recorded: "
                                      f"{json.dumps(form_payload, sort_keys=True, indent=4)}",
                                 disable_notification=True)
