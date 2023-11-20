@@ -4,7 +4,7 @@ import re
 from datetime import datetime as dt, timedelta as td
 
 from handlers.base_handler import BaseHandler
-from resources.keyboards import build_date_keyboard, build_listlike_keyboard
+from resources.keyboards import build_date_keyboard, build_listlike_keyboard, build_reply_keyboard
 
 
 class StartAddingExpense(BaseHandler):
@@ -88,6 +88,8 @@ class AskAmount(BaseHandler):
                                            "\t'10 USD' - amount will be recorded in TRY "
                                            "with conversion rate on the current date",
                                            reply=False,
+                                           reply_markup=build_reply_keyboard(entities=self.config.get("amounts"),
+                                                                             max_items_in_a_row=5),
                                            disable_notification=True)
         await self.save_init_instruction_msg_id(msg, state)
 
@@ -105,33 +107,21 @@ class ParseAmount(BaseHandler):
                                            f"possibly with . or , decimal separator "
                                            f"and USD, EUR, TRY, RUB, usd, eur, rub or try as currency label:",
                                       reply=False,
+                                      reply_markup=build_reply_keyboard(entities=self.config.get("amounts"),
+                                                                        max_items_in_a_row=5),
                                       disable_notification=True)
             await self.save_init_instruction_msg_id(msg, state)
             return
 
-        msg = await message.reply(text=f"🔤Choose any comment to add or choose 'Custom comment' and write custom one:",
-                                  reply_markup=build_listlike_keyboard(self.config.get("comments")),
+        await self.state.commenting.set()
+        msg = await message.reply(text=f"🔤Choose any comment to add or write custom one:",
+                                  reply_markup=build_reply_keyboard(entities=self.config.get("comments"),
+                                                                    max_items_in_a_row=3),
                                   reply=False,
                                   disable_notification=True)
         await self.save_init_instruction_msg_id(msg, state)
 
         await self.fill_payload_field(field_key="amount", value=await self.convert_to_try(message.text), state=state)
-
-
-class InputComment(BaseHandler):
-    async def __call__(self, callback: types.CallbackQuery, state: FSMContext):
-        if callback.data == "Custom comment":
-            msg = await callback.message.reply("🔤Input your comment:",
-                                               reply=False,
-                                               disable_notification=True)
-            await self.save_init_instruction_msg_id(msg, state)
-            await callback.message.delete()
-            await self.state.commenting.set()
-        else:
-            await self.fill_payload_field(field_key="comment", value=callback.data, state=state)
-            await self.send_form_response(chat_id=callback.message.chat.id, state=state)
-            await callback.message.delete()
-            await state.finish()
 
 
 class ParseComment(BaseHandler):

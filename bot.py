@@ -8,7 +8,7 @@ from handlers.basic_handlers import CancelHandler, HealthCheck
 from handlers.expenses import StartAddingExpense, \
     InputDate, ParseDate, \
     ParseAmount, AskAmount, \
-    InputComment, ParseComment
+    ParseComment
 from resources.states import States
 from logger import Logger
 
@@ -54,10 +54,6 @@ class BotRunner:
             ParseAmount(*base_properties),
             state=self.states.entering_amount)
 
-        self.dispatcher.register_callback_query_handler(
-            InputComment(*base_properties),
-            lambda c: c.data in self.config.get("comments"),
-            state="*")
         self.dispatcher.register_message_handler(
             ParseComment(*base_properties),
             state=self.states.commenting)
