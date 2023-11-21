@@ -5,3 +5,6 @@ class States(StatesGroup):
     picking_day = State()
     entering_amount = State()
     commenting = State()
+    shortcut = State()
+    picking_day_shortcut = State()
+    shortcut_parsing = State()

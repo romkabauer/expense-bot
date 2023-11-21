@@ -8,7 +8,8 @@ from handlers.basic_handlers import CancelHandler, HealthCheck
 from handlers.expenses import StartAddingExpense, \
     InputDate, ParseDate, \
     ParseAmount, AskAmount, \
-    ParseComment
+    ParseComment, \
+    ChooseFrequentPaymentShortcut, ParseDateShortcut, ParseShortcut
 from resources.states import States
 from logger import Logger
 
@@ -36,7 +37,7 @@ class BotRunner:
         self.dispatcher.register_message_handler(
             StartAddingExpense(*base_properties),
             # IS_ADMIN_CONDITION,
-            commands='add')
+            commands=['add', 'shortcut'])
 
         self.dispatcher.register_callback_query_handler(
             InputDate(*base_properties),
@@ -58,10 +59,22 @@ class BotRunner:
             ParseComment(*base_properties),
             state=self.states.commenting)
 
+        self.dispatcher.register_callback_query_handler(
+            ChooseFrequentPaymentShortcut(*base_properties),
+            lambda c: c.data in ["today", "yesterday", "other_date"],
+            state=self.states.shortcut)
+        self.dispatcher.register_message_handler(
+            ParseDateShortcut(*base_properties),
+            state=self.states.picking_day_shortcut)
+        self.dispatcher.register_message_handler(
+            ParseShortcut(*base_properties),
+            state=self.states.shortcut_parsing)
+
     async def on_startup(self, *args):
         await self.bot.set_my_commands(
             [
                 BotCommand('add', 'add expense'),
+                BotCommand('shortcut', 'add via shortcuts for frequent expenses'),
                 BotCommand('cancel', 'terminate the flow of the current command'),
                 BotCommand('alive', 'check if bot is available'),
             ]

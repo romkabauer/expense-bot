@@ -61,6 +61,21 @@ class BaseHandler:
             case _:
                 await self.__fill_payload_field_short_text(field_properties["key"], value, state)
 
+    async def get_payload_field(self, field_key: str, state: FSMContext):
+        field_properties = self.config.get("form_payload_mapping").get(field_key)
+        async with state.proxy() as data:
+            if not data.get("form_payload"):
+                return
+            match field_properties["type"]:
+                case "date":
+                    return "-".join([data["form_payload"][f"{field_properties['key']}_year"],
+                                     data["form_payload"][f"{field_properties['key']}_month"],
+                                     data["form_payload"][f"{field_properties['key']}_day"]])
+                case "soft_single_choice":
+                    return data["form_payload"][f"{field_properties['key']}.other_option_response"]
+                case _:
+                    return data["form_payload"][f"{field_properties['key']}"]
+
     async def prettify_form_response(self, form_response: dict):
         prettified_response = {}
         self.logger.info(self, "", f"Original payload: {form_response}")
