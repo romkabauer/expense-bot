@@ -1,22 +1,25 @@
-from aiogram import executor
+import asyncio
 import datetime
 import json
+import logging
 
 from bot import BotRunner
 
 
-def load_config():
+async def main():
     with open('config.json') as config_file:
         cfg = json.load(config_file)
-    return cfg
 
-
-if __name__ == '__main__':
-    config = load_config()
-    bot = BotRunner(config=config)
+    bot = BotRunner(config=cfg)
+    await bot.on_startup()
     bot.register_handlers()
-    bot.logger.info(f"Started: {datetime.datetime.now()}")
-    executor.start_polling(dispatcher=bot.dispatcher,
-                           on_startup=bot.on_startup,
-                           on_shutdown=bot.shutdown,
-                           skip_updates=True)
+    bot.logger.log(bot, "admin", extra_text=f"Bot started: {datetime.datetime.now()}")
+    await bot.dispatcher.start_polling(bot.bot)
+    await bot.shutdown()
+
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except (KeyboardInterrupt, SystemExit):
+        logging.info("Bot stopped!")
