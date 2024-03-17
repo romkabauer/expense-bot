@@ -1,16 +1,17 @@
 import asyncio
 import datetime
-import json
 import logging
+import os
 
 from bot import BotRunner
 
 
 async def main():
-    with open('config.json') as config_file:
-        cfg = json.load(config_file)
+    bot_token = os.getenv("EXPENSE_BOT_TOKEN")
+    if not bot_token:
+        raise KeyError("EXPENSE_BOT_TOKEN environment variable should be specified!")
 
-    bot = BotRunner(config=cfg)
+    bot = BotRunner(bot_token=bot_token)
     await bot.on_startup()
     bot.register_handlers()
     bot.logger.log(bot, "admin", extra_text=f"Bot started: {datetime.datetime.now()}")

@@ -1,22 +1,31 @@
 from abc import abstractmethod
+from typing import Any
 import requests as r
 import re
 from datetime import datetime as dt
-import json
 
-from aiogram import types, Bot
+from aiogram import (
+    types,
+    Bot
+)
 from aiogram.fsm.context import FSMContext
 
 from resources.states import States
 from resources import interface_messages
+from database.database import DatabaseFacade
+from database.models import (
+    Expenses,
+    Categories,
+    UsersProperties
+)
 from logger import Logger
 
 
 class AbstractRouterBuilder:
-    def __init__(self, config: dict):
+    def __init__(self):
         self.state = States
         self.logger = Logger()
-        self.config = config
+        self.db = DatabaseFacade()
         self.router = None
 
     @abstractmethod
@@ -64,109 +73,72 @@ class AbstractRouterBuilder:
         return is_valid
 
     @staticmethod
-    async def is_valid_expense_amount(message: types.Message):
-        if not re.match(r"^\d+([.,]\d+)?( USD|EUR|TRY|RUB|usd|eur|try|rub)?$", message.text):
+    async def is_valid_expense_amount(message: str):
+        if not re.match(r"^\d+([.]\d+)?(.(USD|EUR|TRY|GBP|usd|eur|try|gbp))?$", message):
             return False
         return True
 
-    @staticmethod
-    async def __fill_payload_field_date(field_key: str, value: str, state: FSMContext):
-        date_parts = value.split("-")
-        cur_state_data = await state.get_data()
-        await state.update_data({
-            "form_payload": {
-                **cur_state_data["form_payload"],
-                f"{field_key}_year": date_parts[0],
-                f"{field_key}_month": date_parts[1],
-                f"{field_key}_day": date_parts[2]
-            }
-        })
+    async def get_base_currency(self, user_id):
+        with self.db.get_session() as db:
+            base_currency = db.query(UsersProperties.property_value) \
+                .filter(UsersProperties.properties.has(property_name="base_currency"),
+                        UsersProperties.users.has(user_id=user_id)) \
+                .first()[0]
+        return base_currency["base_currency"]
 
-    @staticmethod
-    async def __fill_payload_field_short_text(field_key: str, value: str | int, state: FSMContext):
-        cur_state_data = await state.get_data()
-        await state.update_data({"form_payload": {
-            **cur_state_data["form_payload"],
-            field_key: value
-        }})
+    async def add_expense_to_db(self, message: types.Message, db, expense_data: dict):
+        data = expense_data["db_payload"]
+        user_id = data["user_id"]
+        amount, currency, rates = await self.get_rates_on_expense_date(
+            data["when"],
+            data["amount"],
+            user_id
+        )
+        db.add(Expenses(
+            user_id=user_id,
+            category_id=db.query(Categories.category_id)
+                          .filter(Categories.category_name == data["category"])
+                          .first()[0],
+            spent_on=data["when"],
+            amount=amount,
+            currency=currency,
+            rates=rates,
+            comment=data["comment"],
+        ))
 
-    @staticmethod
-    async def __fill_payload_field_soft_single_choice(field_key: str, value: str, state: FSMContext):
-        cur_state_data = await state.get_data()
-        await state.update_data({
-            "form_payload": {
-                **cur_state_data["form_payload"],
-                field_key: "__other_option__",
-                f"{field_key}.other_option_response": value
-            }
-        })
+    async def report_expense_details(self,
+                                     message: types.Message,
+                                     expense_data: dict,
+                                     report_message: str = interface_messages.SUCCESS_RECORD,
+                                     details: Any = ""):
+        data = expense_data["db_payload"]
+        expense_date_formatted = dt.strptime(data["when"], '%Y-%m-%d') \
+            .strftime("%B %d %Y (%A)")
+        await message.reply(text=report_message +
+                                 f"    Date: {expense_date_formatted}\n"
+                                 f"    Category: {data['category']}\n"
+                                 f"    Amount: {data['amount']}\n"
+                                 f"    Comment: {data['comment']}" +
+                            str(details),
+                            parse_mode="Markdown",
+                            disable_notification=True)
 
-    async def fill_payload_field(self, field_key: str, value: str | int, state: FSMContext):
-        data = await state.get_data()
-        if not data.get("form_payload"):
-            await state.update_data({"form_payload": {}})
-        field_properties = self.config.get("form_payload_mapping").get(field_key)
-        match field_properties["type"]:
-            case "date":
-                await self.__fill_payload_field_date(field_properties["key"], value, state)
-            case "soft_single_choice":
-                await self.__fill_payload_field_soft_single_choice(field_properties["key"], value, state)
-            case _:
-                await self.__fill_payload_field_short_text(field_properties["key"], value, state)
+    async def get_rates_on_expense_date(self, when: str, amount_with_currency: str, user_id: int):
+        base_currency = await self.get_base_currency(user_id)
+        params = {
+            "base": base_currency,
+            "date": when
+        }
 
-    async def get_payload_field(self, field_key: str, state: FSMContext):
-        field_properties = self.config.get("form_payload_mapping").get(field_key)
-        data = await state.get_data()
-        if not data.get("form_payload"):
-            return
-        match field_properties["type"]:
-            case "date":
-                return "-".join([data["form_payload"][f"{field_properties['key']}_year"],
-                                 data["form_payload"][f"{field_properties['key']}_month"],
-                                 data["form_payload"][f"{field_properties['key']}_day"]])
-            case "soft_single_choice":
-                return data["form_payload"][f"{field_properties['key']}.other_option_response"]
-            case _:
-                return data["form_payload"][f"{field_properties['key']}"]
+        res = r.get("https://api.vatcomply.com/rates", params=params)
+        rates = res.json()
 
-    async def prettify_form_response(self, form_response: dict):
-        prettified_response = {}
-        self.logger.log(self, "", f"Original payload: {form_response}")
-        mapping = self.config.get("form_payload_mapping")
-        for key in mapping.keys():
-            match mapping[key]["type"]:
-                case "date":
-                    prettified_response[key] = form_response.get(f"{mapping[key]['key']}_year") + '-' + \
-                                               form_response.get(f"{mapping[key]['key']}_month") + '-' + \
-                                               form_response.get(f"{mapping[key]['key']}_day")
-                case "soft_single_choice":
-                    prettified_response[key] = form_response.get(f"{mapping[key]['key']}.other_option_response")
-                case _:
-                    prettified_response[key] = form_response.get(mapping[key]["key"])
-        return prettified_response
-
-    async def send_form_response(self, chat_id: int, state: FSMContext, bot: Bot):
-        data = await state.get_data()
-        res = r.post(self.config.get("form_url"), data=data['form_payload'])
-        form_payload = await self.prettify_form_response(data['form_payload'])
-
-        if res.status_code == 200:
-            await bot.send_message(chat_id=chat_id,
-                                   text=interface_messages.SUCCESS_RECORD +
-                                        f"{json.dumps(form_payload, sort_keys=True, indent=4)}",
-                                   disable_notification=True)
-        else:
-            await bot.send_message(chat_id=chat_id,
-                                   text=interface_messages.FAILED_RECORD +
-                                        f"{json.dumps(form_payload, sort_keys=True, indent=4)}",
-                                   disable_notification=True)
-
-    @staticmethod
-    async def convert_to_try(amount_with_currency: str):
-        if any([cur in amount_with_currency.lower() for cur in ['usd', 'eur', 'rub']]):
-            source_currency = amount_with_currency.split(' ')[1]
-            res = r.get(url=f"https://cdn.jsdelivr.net/gh/fawazahmed0/currency-api@1/latest/currencies"
-                            f"/{source_currency.lower()}"
-                            f"/try.min.json")
-            return round(float(amount_with_currency.split(' ')[0]) * res.json().get("try"), 2)
-        return amount_with_currency
+        if any([cur in amount_with_currency.upper() for cur in ['USD', 'EUR', 'RUB', 'TRY']]):
+            source_data = amount_with_currency.split(' ')
+            source_amount, source_currency = float(source_data[0]), source_data[1].upper()
+            return (source_amount,
+                    source_currency,
+                    {"base": rates["base"], "rates": rates["rates"]})
+        return (amount_with_currency,
+                base_currency,
+                {"base": base_currency, "rates": rates["rates"]})

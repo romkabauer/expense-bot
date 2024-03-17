@@ -1,6 +1,9 @@
 import time
 
-from aiogram import types, Router
+from aiogram import (
+    types,
+    Router
+)
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 
@@ -9,8 +12,8 @@ from resources import interface_messages
 
 
 class BasicHandlersRouterBuilder(AbstractRouterBuilder):
-    def __init__(self, config: dict):
-        super().__init__(config)
+    def __init__(self):
+        super().__init__()
         self.router = Router(name=self.__class__.__name__)
 
     def build_default_router(self):
