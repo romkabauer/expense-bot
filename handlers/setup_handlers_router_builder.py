@@ -13,7 +13,8 @@ from sqlalchemy.orm import Session
 from handlers.abstract_router_builder import AbstractRouterBuilder
 from resources import (
     interface_messages,
-    keyboards
+    keyboards,
+    bi_interface
 )
 from database.models import (
     Users,
@@ -29,7 +30,7 @@ class SetupHandlersRouterBuilder(AbstractRouterBuilder):
 
     def build_default_router(self):
         self.router.message.register(self.handler_setup_init,
-                                     Command('setup'))
+                                     Command(*['setup', 'reset']))
 
         self.router.message.register(self.handler_display_settings_menu,
                                      Command('settings'))
@@ -39,15 +40,20 @@ class SetupHandlersRouterBuilder(AbstractRouterBuilder):
 
         self.router.callback_query.register(self.handler_choose_category,
                                             F.data.in_({"amounts", "comments"}))
-        self.router.callback_query.register(self.handler_ask_for_values_for_category,
-                                            self.state.ask_values_for_category)
+        self.router.callback_query.register(self.handler_request_values_for_category,
+                                            self.state.settings_request_values_for_category)
         self.router.message.register(self.handler_parse_values_for_category,
-                                     self.state.setting_values_for_category)
+                                     self.state.settings_parse_values_for_category)
 
         self.router.callback_query.register(self.handler_choose_base_currency,
                                             F.data == "base_currency")
         self.router.callback_query.register(self.handler_set_base_currency,
                                             F.data.in_({"USD", "EUR", "TRY", "RUB"}))
+
+        self.router.message.register(self.handler_setup_analytics,
+                                     Command('analytics'))
+        self.router.message.register(self.handler_reset_analytics,
+                                     Command('reset_analytics'))
 
         self.router.callback_query.register(self.handler_not_implemented,
                                             F.data == "shortcuts")
@@ -56,39 +62,27 @@ class SetupHandlersRouterBuilder(AbstractRouterBuilder):
     async def handler_setup_init(self, message: types.Message, inform: bool = True):
         # TODO: split flow for user to enable manual setup or automatic setup with default settings
         user_id = message.from_user.id
+        command = message.text[1:]
         await message.delete()
         with self.db.get_session() as db:
             self.__create_user(db, user_id)
+            if command == "setup":
+                properties_to_set = self.__get_properties_to_setup(db, user_id)
+                override = False
+            else:
+                properties_to_set = ["categories",
+                                     "base_currency",
+                                     "amounts",
+                                     "comments"]
+                override = True
 
-            for prop in self.__get_properties_to_setup(db, user_id):
-                match prop:
-                    case "categories":
-                        self.__setup_default_property(db, user_id, prop, [
-                            "Fun", "Clothes", "Transportation", "Eat outside",
-                            "Food", "Facilities", "Medicine", "Home", "Other"
-                        ])
-                    case "base_currency":
-                        self.__setup_default_property(db, user_id, prop, {
-                            prop: "USD"
-                        })
-                    case "amounts":
-                        self.__setup_default_property(db, user_id, prop, {
-                            "default": [1, 3, 5, 7, 10, 15, 25, 30],
-                            "Transportation": [5, 15, 20, 30, 50],
-                            "Eat outside": [10, 15, 20, 25, 30, 40, 50, 60]
-                        })
-                    case "comments":
-                        self.__setup_default_property(db, user_id, prop, {
-                            "default": ["Groceries", "Weekly groceries", "Cafe", "Restaurant",
-                                        "MyFavoriteDoner", "Taxi", "Public transport", "Water",
-                                        "Electricity", "Heating", "Internet"]
-                        })
-                    case _:
-                        pass
+            self.__setup_default_properties(db, properties_to_set, user_id, override)
             db.commit()
 
         if inform:
-            msg = await message.answer(text=interface_messages.DEFAULT_SETUP_SUCCESSFUL,
+            information_text = interface_messages.DEFAULT_SETUP_SUCCESSFUL \
+                if command == "setup" else interface_messages.RESET_SUCCESSFUL
+            msg = await message.answer(text=information_text,
                                        disable_notification=True)
             time.sleep(5)
             await msg.delete()
@@ -126,15 +120,11 @@ class SetupHandlersRouterBuilder(AbstractRouterBuilder):
 
     async def handler_set_base_currency(self, callback: types.CallbackQuery, state: FSMContext):
         with self.db.get_session() as db:
-            pid = db.query(Properties.property_id) \
-                .filter(Properties.property_name == "base_currency").first()[0]
-            db.bulk_update_mappings(UsersProperties, [{
-                "user_id": callback.from_user.id,
-                "property_id": pid,
-                "property_value": {
-                    "base_currency": callback.data
-                }
-            }])
+            self.__setup_default_property(db_session=db,
+                                          user_id=callback.from_user.id,
+                                          property_name="base_currency",
+                                          property_value={"base_currency": callback.data},
+                                          is_update=True)
             db.commit()
 
         msg = await callback.message.reply(interface_messages.SETTINGS_SET_SUCCESS,
@@ -167,9 +157,9 @@ class SetupHandlersRouterBuilder(AbstractRouterBuilder):
                                            disable_notification=True)
         await callback.message.delete()
         await self.save_init_instruction_msg_id(msg, state)
-        await state.set_state(self.state.ask_values_for_category)
+        await state.set_state(self.state.settings_request_values_for_category)
 
-    async def handler_ask_for_values_for_category(self, callback: types.CallbackQuery, state: FSMContext):
+    async def handler_request_values_for_category(self, callback: types.CallbackQuery, state: FSMContext):
         state_data = await state.get_data()
         with self.db.get_session() as db:
             current_value = db.query(UsersProperties.property_value) \
@@ -181,11 +171,11 @@ class SetupHandlersRouterBuilder(AbstractRouterBuilder):
         await state.update_data({"setting_property_category": callback.data})
 
         msg = await callback.message.reply(f"Current values: {current_value}\n\n" +
-                                           interface_messages.SETTINGS_ASK_FOR_VALUES_FOR_CATEGORY,
+                                           interface_messages.SETTINGS_REQUEST_VALUES_FOR_CATEGORY,
                                            disable_notification=True)
         await callback.message.delete()
         await self.save_init_instruction_msg_id(msg, state)
-        await state.set_state(self.state.setting_values_for_category)
+        await state.set_state(self.state.settings_parse_values_for_category)
 
     async def handler_parse_values_for_category(self, message: types.Message, state: FSMContext, bot: Bot):
         await self.delete_init_instruction(message.chat.id, state, bot)
@@ -205,20 +195,12 @@ class SetupHandlersRouterBuilder(AbstractRouterBuilder):
                 pass
 
         with self.db.get_session() as db:
-            pid = db.query(Properties.property_id) \
-                .filter(Properties.property_name == state_data["setting_property"]).first()[0]
-            prop_value = db.query(UsersProperties.property_value) \
-                .filter(UsersProperties.properties.has(
-                            Properties.property_name == state_data["setting_property"]
-                        ),
-                        UsersProperties.user_id == message.from_user.id
-                ).first()[0]
-            prop_value[state_data["setting_property_category"]] = new_values
-            db.bulk_update_mappings(UsersProperties, [{
-                "user_id": message.from_user.id,
-                "property_id": pid,
-                "property_value": prop_value
-            }])
+            self.__setup_default_property(db_session=db,
+                                          user_id=message.from_user.id,
+                                          property_name=state_data["setting_property"],
+                                          property_value=new_values,
+                                          category=state_data["setting_property_category"],
+                                          is_update=True)
             db.commit()
 
         msg = await message.answer(interface_messages.SETTINGS_SET_SUCCESS,
@@ -227,6 +209,43 @@ class SetupHandlersRouterBuilder(AbstractRouterBuilder):
         time.sleep(2)
         await msg.delete()
         await state.clear()
+
+    async def handler_setup_analytics(self, message: types.Message):
+        superset = bi_interface.SuperSetInterface()
+        if not await superset.is_user_exist(message.from_user.id):
+            password = await superset.create_user_with_custom_role(message.from_user.id)
+            await message.answer(f"User for Superset app created.\n\n"
+                                 f"Superset dashboard available for you here: "
+                                 f"{superset.superset_ui_url}\n\n"
+                                 f"Your sign-in credentials:"
+                                 f"Username: user_{message.from_user.id}\n"
+                                 f"Password: {password}\n\n"
+                                 f"You can change your password after login via "
+                                 f"'Settings' in upper-right corner of the screen "
+                                 f"-> 'Info' -> '🔒Reset My Password'.",
+                                 disable_notification=True)
+        else:
+            await message.answer(f"User for Superset app was created earlier.\n\n"
+                                 f"Superset dashboard available for you here: "
+                                 f"{superset.superset_ui_url}\n\n"
+                                 f"Your username: user_{message.from_user.id}\n",
+                                 disable_notification=True)
+        await message.delete()
+
+    async def handler_reset_analytics(self, message: types.Message):
+        superset = bi_interface.SuperSetInterface()
+        password = await superset.reset_user(message.from_user.id)
+        await message.answer(f"User for Superset app re-created.\n\n"
+                             f"Superset dashboard available for you here: "
+                             f"{superset.superset_ui_url}\n\n"
+                             f"Your sign-in credentials:"
+                             f"Username: user_{message.from_user.id}\n"
+                             f"Password: {password}\n\n"
+                             f"You can change your password after login via "
+                             f"'Settings' in upper-right corner of the screen "
+                             f"-> 'Info' -> '🔒Reset My Password'.",
+                             disable_notification=True)
+        await message.delete()
 
     async def handler_not_implemented(self, callback: types.CallbackQuery, state: FSMContext):
         msg = await callback.message.answer(interface_messages.SETTINGS_NOT_IMPLEMENTED,
@@ -249,22 +268,72 @@ class SetupHandlersRouterBuilder(AbstractRouterBuilder):
         existing_props = db_session.query(UsersProperties.property_id) \
             .filter(UsersProperties.user_id == user_id).all()
         existing_props = [x[0] for x in existing_props]
-        props = db_session.query(Properties.property_name) \
-            .filter(
-                Properties.property_id.notin_(existing_props),
-                Properties.is_required is True
-            ).all()
+        filters = [Properties.is_required == True]
+        if existing_props:
+            filters.append(Properties.property_id.notin_(existing_props))
+        props = db_session.query(Properties.property_name).filter(*filters).all()
+        print(props)
         return [x[0] for x in props]
+
+    def __setup_default_properties(self,
+                                   db_session: Session,
+                                   properties_to_set: list[str],
+                                   user_id: int,
+                                   is_update: bool = False):
+        for prop in properties_to_set:
+            match prop:
+                case "categories":
+                    self.__setup_default_property(db_session, user_id, prop, [
+                        "Fun", "Clothes", "Transportation", "Eat outside",
+                        "Food", "Facilities", "Medicine", "Home", "Other"
+                    ], is_update=is_update)
+                case "base_currency":
+                    self.__setup_default_property(db_session, user_id, prop, {
+                        prop: "USD"
+                    }, is_update=is_update)
+                case "amounts":
+                    self.__setup_default_property(db_session, user_id, prop, {
+                        "default": [1, 3, 5, 7, 10, 15, 25, 30],
+                        "Transportation": [5, 15, 20, 30, 50],
+                        "Eat outside": [10, 15, 20, 25, 30, 40, 50, 60]
+                    }, is_update=is_update)
+                case "comments":
+                    self.__setup_default_property(db_session, user_id, prop, {
+                        "default": ["Groceries", "Weekly groceries", "Cafe", "Restaurant",
+                                    "MyFavoriteDoner", "Taxi", "Public transport", "Water",
+                                    "Electricity", "Heating", "Internet"]
+                    }, is_update=is_update)
+                case _:
+                    pass
 
     @staticmethod
     def __setup_default_property(db_session: Session,
                                  user_id: int,
                                  property_name: str,
-                                 property_value: dict | list | None):
+                                 property_value: dict | list | None,
+                                 category: str | None = None,
+                                 is_update: bool = False):
         categories_prop = db_session.query(Properties) \
             .filter(Properties.property_name == property_name).first()
-        db_session.add(UsersProperties(
-            property_id=categories_prop.property_id,
-            user_id=user_id,
-            property_value=property_value
-        ))
+        if is_update:
+            if category:
+                filters = [
+                    UsersProperties.properties.has(Properties.property_name == property_name),
+                    UsersProperties.user_id == user_id
+                ]
+                current_prop_value = db_session.query(UsersProperties.property_value) \
+                    .filter(*filters).first()[0]
+                current_prop_value[category] = property_value
+                property_value = current_prop_value
+            db_session.bulk_update_mappings(UsersProperties, [{
+                "user_id": user_id,
+                "property_id": categories_prop.property_id,
+                "property_value": property_value
+            }])
+            db_session.commit()
+        else:
+            db_session.add(UsersProperties(
+                property_id=categories_prop.property_id,
+                user_id=user_id,
+                property_value=property_value
+            ))

@@ -8,5 +8,5 @@ class States(StatesGroup):
     commenting = State()
     shortcut = State()
     shortcut_parsing = State()
-    ask_values_for_category = State()
-    setting_values_for_category = State()
+    settings_request_values_for_category = State()
+    settings_parse_values_for_category = State()

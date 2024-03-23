@@ -112,12 +112,13 @@ class AbstractRouterBuilder:
                                      report_message: str = interface_messages.SUCCESS_RECORD,
                                      details: Any = ""):
         data = expense_data["db_payload"]
+        amount = f"{data['amount']} {await self.get_base_currency(message.from_user.id)}"
         expense_date_formatted = dt.strptime(data["when"], '%Y-%m-%d') \
             .strftime("%B %d %Y (%A)")
         await message.reply(text=report_message +
                                  f"    Date: {expense_date_formatted}\n"
                                  f"    Category: {data['category']}\n"
-                                 f"    Amount: {data['amount']}\n"
+                                 f"    Amount: {amount}\n"
                                  f"    Comment: {data['comment']}" +
                             str(details),
                             parse_mode="Markdown",

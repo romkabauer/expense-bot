@@ -51,6 +51,9 @@ services:
     environment:
       - EXPENSE_BOT_TOKEN
       - EXPENSE_BOT_DB_CONNECTION_STRING
+      - SUPERSET_ADMIN_USERNAME
+      - SUPERSET_ADMIN_PASSWORD
+      - SUPERSET_UI_URL
 
 volumes:
   local_pgdata:

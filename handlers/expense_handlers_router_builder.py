@@ -234,22 +234,22 @@ class ExpenseHandlersRouterBuilder(AbstractRouterBuilder):
         """
         cur_state_data = await state.get_data()
         self.logger.log(self, callback.from_user.id, str(cur_state_data))
-        await self.delete_init_instruction(callback.message.chat.id, state, bot)
 
         shortcut_payload = cur_state_data["shortcuts_payloads"][callback.data]
         expense_data = {
                 "db_payload": {
-                    "when": shortcut_payload["when"],
+                    "when": cur_state_data["db_payload"]["when"],
                     "category": shortcut_payload["category"],
                     "amount": shortcut_payload["amount"],
                     "user_id": callback.from_user.id,
-                    "comment": shortcut_payload["comment"]
+                    "comment": callback.data
                 }
             }
         with self.db.get_session() as db:
             await self.add_expense_to_db(callback.message, db, expense_data)
             db.commit()
         await self.report_expense_details(callback.message, expense_data)
+        await self.delete_init_instruction(callback.message.chat.id, state, bot)
         await state.clear()
 
     async def __ask_expense_category(self,
