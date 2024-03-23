@@ -1,15 +1,10 @@
 from aiogram import Bot, Dispatcher
 from aiogram.types.bot_command import BotCommand
-from aiogram.contrib.fsm_storage.memory import MemoryStorage
-from aiogram.contrib.middlewares.logging import LoggingMiddleware
+from aiogram.fsm.storage.memory import MemoryStorage
 
 
-from handlers.basic_handlers import CancelHandler, HealthCheck
-from handlers.expenses import StartAddingExpense, \
-    InputDate, ParseDate, \
-    ParseAmount, AskAmount, \
-    ParseComment, \
-    ChooseFrequentPaymentShortcut, ParseDateShortcut, ParseShortcut
+from handlers.basic_handlers_router_builder import BasicHandlersRouterBuilder
+from handlers.expense_handlers_router_builder import ExpenseHandlersRouterBuilder
 from resources.states import States
 from logger import Logger
 
@@ -18,68 +13,28 @@ class BotRunner:
     def __init__(self, config: dict):
         self.bot = Bot(token=config.get("bot_token"))
         self.config = config
-        self.dispatcher = Dispatcher(self.bot, storage=MemoryStorage())
-        self.dispatcher.middleware.setup(LoggingMiddleware())
+        self.dispatcher = Dispatcher(storage=MemoryStorage())
         self.logger = Logger()
         self.states = States
 
     def register_handlers(self):
-        # IS_ADMIN_CONDITION = lambda c: c.from_user.id in self.admins
-        base_properties = self.bot, self.states, self.logger, self.config
+        basic_router = BasicHandlersRouterBuilder(config=self.config)
+        basic_router = basic_router.build_default_router()
 
-        self.dispatcher.register_message_handler(
-            CancelHandler(*base_properties),
-            commands=['cancel'],
-            state='*')
-        self.dispatcher.register_message_handler(
-            HealthCheck(*base_properties),
-            commands='alive')
-        self.dispatcher.register_message_handler(
-            StartAddingExpense(*base_properties),
-            # IS_ADMIN_CONDITION,
-            commands=['add', 'shortcut'])
+        expense_router = ExpenseHandlersRouterBuilder(config=self.config)
+        expense_router = expense_router.build_default_router()
 
-        self.dispatcher.register_callback_query_handler(
-            InputDate(*base_properties),
-            lambda c: c.data in ["today", "yesterday", "other_date"])
-        self.dispatcher.register_message_handler(
-            ParseDate(*base_properties),
-            state=self.states.picking_day)
-
-        self.dispatcher.register_callback_query_handler(
-            AskAmount(*base_properties),
-            lambda c: c.data in self.config.get("spending_categories"),
-            state="*")
-
-        self.dispatcher.register_message_handler(
-            ParseAmount(*base_properties),
-            state=self.states.entering_amount)
-
-        self.dispatcher.register_message_handler(
-            ParseComment(*base_properties),
-            state=self.states.commenting)
-
-        self.dispatcher.register_callback_query_handler(
-            ChooseFrequentPaymentShortcut(*base_properties),
-            lambda c: c.data in ["today", "yesterday", "other_date"],
-            state=self.states.shortcut)
-        self.dispatcher.register_message_handler(
-            ParseDateShortcut(*base_properties),
-            state=self.states.picking_day_shortcut)
-        self.dispatcher.register_message_handler(
-            ParseShortcut(*base_properties),
-            state=self.states.shortcut_parsing)
+        self.dispatcher.include_routers(*[basic_router, expense_router])
 
     async def on_startup(self, *args):
         await self.bot.set_my_commands(
             [
-                BotCommand('add', 'add expense'),
-                BotCommand('shortcut', 'add via shortcuts for frequent expenses'),
-                BotCommand('cancel', 'terminate the flow of the current command'),
-                BotCommand('alive', 'check if bot is available'),
+                BotCommand(command='add', description='add expense'),
+                BotCommand(command='shortcut', description='add via shortcuts for frequent expenses'),
+                BotCommand(command='cancel', description='terminate the flow of the current command'),
+                BotCommand(command='alive', description='check if bot is available'),
             ]
         )
 
     async def shutdown(self, *args):
         await self.dispatcher.storage.close()
-        await self.dispatcher.storage.wait_closed()

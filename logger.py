@@ -14,10 +14,16 @@ class Logger:
         ch.setFormatter(logging.Formatter(self._log_format))
         self.logger.addHandler(ch)
 
-    def info(self, action, user: str = '', extra_text: str = ''):
+    def log(self, action, user: str = '', extra_text: str = '', level: str = "info"):
         action = action.__class__.__name__
         extra_text = extra_text.replace(self._sep, '//')
         if user:
             user = str(user)
         message = self._sep.join([action, user, extra_text])
-        self.logger.info(message)
+        match level:
+            case "warn":
+                self.logger.warning(message)
+            case "error":
+                self.logger.error(message)
+            case _:
+                self.logger.info(message)

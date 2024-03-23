@@ -4,7 +4,7 @@ from resources.helpers import chunk_list
 
 
 def build_date_keyboard():
-    return InlineKeyboardMarkup(3, [
+    return InlineKeyboardMarkup(inline_keyboard=[
         [
             InlineKeyboardButton(text="today", callback_data="today"),
             InlineKeyboardButton(text="yesterday", callback_data="yesterday"),
@@ -16,7 +16,7 @@ def build_date_keyboard():
 def build_reply_keyboard(entities: list[str],
                          max_items_in_a_row: int = 2,
                          additional_items=None):
-    return ReplyKeyboardMarkup([
+    return ReplyKeyboardMarkup(keyboard=[
         [KeyboardButton(text=str(item)) for item in chunk]
         for chunk in chunk_list(entities if not additional_items else entities + additional_items,
                                 max_items_in_a_row)
@@ -31,4 +31,4 @@ def build_listlike_keyboard(entities: list[str],
             for chunk in chunk_list(entities if not additional_items else entities+additional_items,
                                     max_items_in_a_row)
     ]
-    return InlineKeyboardMarkup(3, buttons)
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
