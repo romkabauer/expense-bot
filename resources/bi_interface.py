@@ -152,7 +152,6 @@ class SuperSetInterface(GenericBIInterface):
         return response.json()["result"]
 
     async def __get_viewer_permission_ids(self):
-        print(f"Permission ids START", dt.now())
         permission_ids_coroutines = []
         for permission_scope in self.default_viewer_permission_scope:
             permission_id_coroutine = self.__get_permission_resource_id(
@@ -161,11 +160,9 @@ class SuperSetInterface(GenericBIInterface):
             )
             permission_ids_coroutines.append(permission_id_coroutine)
         ids = await gather(*permission_ids_coroutines)
-        print(f"Permission ids FINISH", dt.now())
         return ids
 
     async def __get_permission_resource_id(self, permission_name: str, resource_name: str):
-        print(f"Permission id {permission_name} START", dt.now())
         permission_id = await self.__get_internal_entity_id_by_name(
             "permissions",
             {
@@ -195,7 +192,6 @@ class SuperSetInterface(GenericBIInterface):
                 "value": resource_id
             },
         )
-        print(f"Permission id {permission_name} FINISH", dt.now())
         return permission_resource_map_id
 
     async def __get_internal_entity_id_by_name(self,
