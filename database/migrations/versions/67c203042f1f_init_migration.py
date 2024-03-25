@@ -48,6 +48,10 @@ sa.Column('id', sa.UUID(), nullable=False),
             },
             {
                 "id": uuid.uuid4(),
+                "name": "Rent",
+            },
+            {
+                "id": uuid.uuid4(),
                 "name": "Home",
             },
             {

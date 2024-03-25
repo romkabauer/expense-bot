@@ -217,7 +217,7 @@ class SetupHandlersRouterBuilder(AbstractRouterBuilder):
             await message.answer(f"User for Superset app created.\n\n"
                                  f"Superset dashboard available for you here: "
                                  f"{superset.superset_ui_url}\n\n"
-                                 f"Your sign-in credentials:"
+                                 f"Your sign-in credentials:\n"
                                  f"Username: user_{message.from_user.id}\n"
                                  f"Password: {password}\n\n"
                                  f"You can change your password after login via "
