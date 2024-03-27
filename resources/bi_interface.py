@@ -79,6 +79,10 @@ class SuperSetInterface(GenericBIInterface):
                 "permission_name": "can_info",
                 "view_menu_name": "User"
             },
+            {
+                "permission_name": "can_time_range",
+                "view_menu_name": "Api"
+            },
         ]
 
     async def create_user_with_custom_role(self, user_id: int) -> str:
