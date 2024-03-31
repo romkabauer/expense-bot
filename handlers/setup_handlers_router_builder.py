@@ -20,6 +20,7 @@ from database.models import (
     Users,
     UsersProperties,
     Properties,
+    Categories,
 )
 
 
@@ -37,6 +38,8 @@ class SetupHandlersRouterBuilder(AbstractRouterBuilder):
 
         self.router.callback_query.register(self.handler_set_categories,
                                             F.data == "categories")
+        self.router.callback_query.register(self.handler_choosing_active_categories,
+                                            self.state.settings_choosing_active_categories)
 
         self.router.callback_query.register(self.handler_choose_category,
                                             F.data.in_({"amounts", "comments"}))
@@ -55,8 +58,15 @@ class SetupHandlersRouterBuilder(AbstractRouterBuilder):
         self.router.message.register(self.handler_reset_analytics,
                                      Command('reset_analytics'))
 
-        self.router.callback_query.register(self.handler_not_implemented,
+        self.router.callback_query.register(self.handler_ask_shortcut_category,
                                             F.data == "shortcuts")
+        self.router.callback_query.register(self.handler_ask_shortcut_amount,
+                                            self.state.settings_ask_shortcut_amount)
+        self.router.message.register(self.handler_parse_shortcut_amount,
+                                     self.state.settings_parse_shortcut_amount)
+        self.router.message.register(self.handler_add_shortcut,
+                                     self.state.settings_ask_shortcut_name)
+
         return self.router
 
     async def handler_setup_init(self, message: types.Message, inform: bool = True):
@@ -127,20 +137,54 @@ class SetupHandlersRouterBuilder(AbstractRouterBuilder):
                                           is_update=True)
             db.commit()
 
-        msg = await callback.message.reply(interface_messages.SETTINGS_SET_SUCCESS,
-                                           disable_notification=True)
+        await callback.answer(interface_messages.SETTINGS_SET_SUCCESS,
+                                    disable_notification=True)
         await callback.message.delete()
-        time.sleep(2)
-        await msg.delete()
 
     async def handler_set_categories(self, callback: types.CallbackQuery, state: FSMContext):
-        msg = await callback.message.reply(interface_messages.SETTINGS_NOT_IMPLEMENTED +
-                                           "\n\nChanges for category setting "
-                                           "are expected in 1 month.",
+        with self.db.get_session() as db:
+            chosen_categories = db.query(UsersProperties.property_value) \
+                .filter(UsersProperties.properties.has(
+                    Properties.property_name == "categories"
+                ),
+                UsersProperties.user_id == callback.from_user.id
+            ).first()[0]
+            categories = db.query(Categories.category_name).all()
+            categories = [x[0] for x in categories]
+        categories_map = {category: category in chosen_categories for category in categories}
+        await state.update_data({"categories_setting": categories_map})
+        msg = await callback.message.reply("Pick categories you would like to see while adding new expense:",
+                                           reply_markup=keyboards.build_switchers_keyboard(categories_map),
                                            disable_notification=True)
         await callback.message.delete()
-        time.sleep(3)
-        await msg.delete()
+        await self.save_init_instruction_msg_id(msg, state)
+        await state.set_state(self.state.settings_choosing_active_categories)
+
+    async def handler_choosing_active_categories(self, callback: types.CallbackQuery, state: FSMContext, bot: Bot):
+        cur_state_data = await state.get_data()
+        categories_map = cur_state_data["categories_setting"]
+
+        if not callback.data == "Confirm!":
+            categories_map[callback.data] = not categories_map[callback.data]
+            await state.update_data({"categories_setting": categories_map})
+            await callback.message.edit_reply_markup(
+                reply_markup=keyboards.build_switchers_keyboard(categories_map),
+                disable_notification=True)
+            return
+
+        with self.db.get_session() as db:
+            categories_prop = db.query(Properties) \
+                .filter(Properties.property_name == "categories").first()
+            db.bulk_update_mappings(UsersProperties, [{
+                "user_id": callback.from_user.id,
+                "property_id": categories_prop.property_id,
+                "property_value": [cat for cat, is_active in categories_map.items() if is_active]
+            }])
+            db.commit()
+        await callback.answer("✅ Categories set successfully!",
+                              disable_notification=True)
+        await self.delete_init_instruction(callback.from_user.id, state, bot)
+        await state.clear()
 
     async def handler_choose_category(self, callback: types.CallbackQuery, state: FSMContext):
         await state.update_data({"setting_property": callback.data})
@@ -247,6 +291,97 @@ class SetupHandlersRouterBuilder(AbstractRouterBuilder):
                              disable_notification=True)
         await message.delete()
 
+    async def handler_ask_shortcut_category(self, callback: types.CallbackQuery, state: FSMContext):
+        await callback.answer()
+        with self.db.get_session() as db:
+            reply_msg = interface_messages.ASK_EXPENSE_CATEGORY
+            keyboard_layout = [x[0] for x in db.query(Categories.category_name).all()]
+        msg = await callback.message.reply(reply_msg,
+                                           reply_markup=keyboards.build_listlike_keyboard(
+                                               entities=keyboard_layout,
+                                               max_items_in_a_row=3),
+                                           reply=False,
+                                           disable_notification=True)
+        await callback.message.delete()
+        await self.save_init_instruction_msg_id(msg, state)
+        await state.set_state(self.state.settings_ask_shortcut_amount)
+
+    async def handler_ask_shortcut_amount(self, callback: types.CallbackQuery, state: FSMContext):
+        await callback.answer()
+        await state.update_data({"shortcut_payload": {
+            "category": callback.data
+        }})
+        msg = await callback.message.reply(interface_messages.ASK_EXPENSE_AMOUNT,
+                                           reply=False,
+                                           disable_notification=True)
+        await callback.message.delete()
+        await self.save_init_instruction_msg_id(msg, state)
+
+        await state.set_state(self.state.settings_parse_shortcut_amount)
+
+    async def handler_parse_shortcut_amount(self, message: types.Message, state: FSMContext, bot: Bot):
+        await self.delete_init_instruction(message.chat.id, state, bot)
+        cur_state_data = await state.get_data()
+
+        if not await self.is_valid_expense_amount(message.text):
+            msg = await message.reply(text=interface_messages.WRONG_EXPENSE_AMOUNT_FORMAT,
+                                      reply=False,
+                                      disable_notification=True)
+            await message.delete()
+            await self.save_init_instruction_msg_id(msg, state)
+            return
+
+        await state.update_data({"shortcut_payload": {
+            **cur_state_data["shortcut_payload"],
+            "amount": message.text
+        }})
+        msg = await message.reply(text="🔤 What will be the shortcut name?\n"
+                                  "If you provide already existing name, it will be overwritten.",
+                                  reply=False,
+                                  disable_notification=True)
+        await self.save_init_instruction_msg_id(msg, state)
+        await message.delete()
+        await state.set_state(self.state.settings_ask_shortcut_name)
+
+    async def handler_add_shortcut(self, message: types.Message, state: FSMContext, bot: Bot):
+        is_first_shortcut = False
+        await self.delete_init_instruction(message.chat.id, state, bot)
+        cur_state_data = await state.get_data()
+
+        with self.db.get_session() as db:
+            filters = [
+                    UsersProperties.properties.has(Properties.property_name == "shortcuts"),
+                    UsersProperties.user_id == message.from_user.id
+                ]
+            cur_prop_value = db.query(UsersProperties.property_value) \
+                .filter(*filters).first()
+            if cur_prop_value:
+                cur_prop_value = cur_prop_value[0]
+            else:
+                cur_prop_value = {}
+                is_first_shortcut = True
+            cur_prop_value[message.text] = cur_state_data["shortcut_payload"]
+
+            prop_id = db.query(Properties.property_id).filter(
+                Properties.property_name == "shortcuts"
+            ).first()[0]
+            property_payload = {
+                "user_id": message.from_user.id,
+                "property_id": prop_id,
+                "property_value": cur_prop_value
+            }
+
+            if is_first_shortcut:
+                db.add(UsersProperties(**property_payload))
+            else:
+                db.bulk_update_mappings(UsersProperties, [property_payload])
+            db.commit()
+        msg = await message.answer(interface_messages.SETTINGS_SET_SUCCESS,
+                                   disable_notification=True)
+        await message.delete()
+        time.sleep(2)
+        await msg.delete()
+
     async def handler_not_implemented(self, callback: types.CallbackQuery, state: FSMContext):
         msg = await callback.message.answer(interface_messages.SETTINGS_NOT_IMPLEMENTED,
                                             disable_notification=True)
@@ -285,7 +420,7 @@ class SetupHandlersRouterBuilder(AbstractRouterBuilder):
                 case "categories":
                     self.__setup_default_property(db_session, user_id, prop, [
                         "Fun", "Clothes", "Transportation", "Eat outside",
-                        "Food", "Facilities", "Medicine", "Home", "Other"
+                        "Food", "Facilities", "Medicine", "Home", "Other", "Rent"
                     ], is_update=is_update)
                 case "base_currency":
                     self.__setup_default_property(db_session, user_id, prop, {

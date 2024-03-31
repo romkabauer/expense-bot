@@ -22,6 +22,17 @@ def build_reply_keyboard(entities: list[str],
                                 max_items_in_a_row)
     ])
 
+def build_switchers_keyboard(entities: dict[str, bool],
+                             max_items_in_a_row: int = 2,
+                             stopper_name: str = "Confirm!"):
+    buttons = [
+            [InlineKeyboardButton(text="✅" + str(item) if entities[item] else "🔲" + str(item),
+                                  callback_data=str(item)) for item in chunk]
+            for chunk in chunk_list(entities.keys(), max_items_in_a_row)
+        ]
+    buttons.append([InlineKeyboardButton(text=stopper_name,
+                                         callback_data=stopper_name)])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 def build_listlike_keyboard(entities: list[str],
                             additional_items: list[str] | None = None,

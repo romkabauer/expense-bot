@@ -107,12 +107,18 @@ class AbstractRouterBuilder:
         ))
 
     async def report_expense_details(self,
-                                     message: types.Message,
+                                     message: types.Message | types.CallbackQuery,
                                      expense_data: dict,
                                      report_message: str = interface_messages.SUCCESS_RECORD,
                                      details: Any = ""):
+        if isinstance(message, types.Message):
+            user_id, message = message.from_user.id, message
+        else:
+            user_id, message = message.from_user.id, message.message
+        self.logger.log(self, message.from_user.id)
         data = expense_data["db_payload"]
-        amount = f"{data['amount']} {await self.get_base_currency(message.from_user.id)}"
+        amount = f"{data['amount']} {await self.get_base_currency(user_id)}" \
+            if " " not in data['amount'] else f"{data['amount']}"
         expense_date_formatted = dt.strptime(data["when"], '%Y-%m-%d') \
             .strftime("%B %d %Y (%A)")
         await message.reply(text=report_message +

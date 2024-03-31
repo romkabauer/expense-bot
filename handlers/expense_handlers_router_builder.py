@@ -248,7 +248,7 @@ class ExpenseHandlersRouterBuilder(AbstractRouterBuilder):
         with self.db.get_session() as db:
             await self.add_expense_to_db(callback.message, db, expense_data)
             db.commit()
-        await self.report_expense_details(callback.message, expense_data)
+        await self.report_expense_details(callback, expense_data)
         await self.delete_init_instruction(callback.message.chat.id, state, bot)
         await state.clear()
 
@@ -303,7 +303,8 @@ class ExpenseHandlersRouterBuilder(AbstractRouterBuilder):
         commenting_msg = interface_messages.ASK_COMMENT \
             if comment_suggestions else interface_messages.ASK_COMMENT_CUSTOM
 
-        msg = await message.reply(text=commenting_msg, reply_markup=reply_markup,
+        msg = await message.reply(text=commenting_msg,
+                                  reply_markup=reply_markup,
                                   reply=False,
                                   disable_notification=True)
         await self.save_init_instruction_msg_id(msg, state)
