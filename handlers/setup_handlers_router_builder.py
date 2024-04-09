@@ -214,7 +214,7 @@ class SetupHandlersRouterBuilder(AbstractRouterBuilder):
             ).first()[0].get(callback.data, "no values set")
         await state.update_data({"setting_property_category": callback.data})
 
-        msg = await callback.message.reply(f"Current values: {current_value}\n\n" +
+        msg = await callback.message.reply(f"Current values: {', '.join(current_value)}\n\n" +
                                            interface_messages.SETTINGS_REQUEST_VALUES_FOR_CATEGORY,
                                            disable_notification=True)
         await callback.message.delete()
