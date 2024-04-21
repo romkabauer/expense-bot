@@ -115,7 +115,7 @@ class AbstractRouterBuilder:
             user_id, message = message.from_user.id, message
         else:
             user_id, message = message.from_user.id, message.message
-        self.logger.log(self, message.from_user.id)
+        self.logger.log(self, str(message.from_user.id), str(expense_data))
         data = expense_data["db_payload"]
         amount = f"{data['amount']} {await self.get_base_currency(user_id)}" \
             if " " not in data['amount'] else f"{data['amount']}"
