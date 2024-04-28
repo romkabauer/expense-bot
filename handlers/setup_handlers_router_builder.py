@@ -211,7 +211,7 @@ class SetupHandlersRouterBuilder(AbstractRouterBuilder):
                     Properties.property_name == state_data["setting_property"]
                 ),
                 UsersProperties.user_id == callback.from_user.id
-            ).first()[0].get(callback.data, "no values set")
+            ).first()[0].get(callback.data, ["no values set"])
         await state.update_data({"setting_property_category": callback.data})
 
         msg = await callback.message.reply(f"Current values: {', '.join(current_value)}\n\n" +

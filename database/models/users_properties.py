@@ -20,7 +20,7 @@ class UsersProperties(Base):
     user_id = Column("user_id", BigInteger, ForeignKey("users.id"))
     property_value = Column("property_value", JSON, nullable=False)
     created_at = Column("created_at", DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = Column("updated_at", DateTime, nullable=False, default=datetime.utcnow, onupdate=func.now)
+    updated_at = Column("updated_at", DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     users = relationship("Users", back_populates="users_properties")
     properties = relationship("Properties", back_populates="users_properties")
