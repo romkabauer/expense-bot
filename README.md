@@ -109,3 +109,10 @@ Probably, you will need some adjustments, please reach out to me via Telegram (@
 
 - Separate user is being created for every user who issues command "/analytics".
 - Every user created has its own RLS (Row-Level Security) policy which configured to display only user's expenses in Apache Superset. More about RLS: https://superset.apache.org/docs/security/#row-level-security 
+
+## Future plans:
+- "Family" expenses and shared access to BI
+- Suggestion of new categories with moderation
+
+### Deployment
+- Configure env vars and deploy and via Terraform
