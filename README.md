@@ -4,8 +4,8 @@
 
 ## What you can do with this bot?
 
-- 💵 Enter your expenses [DEMO](https://drive.google.com/uc?export=view&id=1PeNNdfNKj2sGoNvFi0LxWXUWuhzn7b1v)
-- 📊 Analyse expenses in BI tool (Apache Superset) privately [DEMO](https://drive.google.com/uc?export=view&id=1PYZhLen7lJgmUGyIJTZKjFEp4FiHXT6F)
+- 💵 Enter your expenses [DEMO](https://drive.google.com/file/d/1PeNNdfNKj2sGoNvFi0LxWXUWuhzn7b1v/view?usp=drive_link)
+- 📊 Analyse expenses in BI tool (Apache Superset) privately [DEMO](https://drive.google.com/file/d/1PYZhLen7lJgmUGyIJTZKjFEp4FiHXT6F/view?usp=drive_link)
 
 ![bi_view](https://drive.google.com/uc?export=view&id=1wWktv4auGYKZ-8OUF38uhJIS80c8OQo_)
 
