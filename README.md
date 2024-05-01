@@ -11,6 +11,8 @@
 
 ## How to start using bot?
 
+💸[Start using Expense Bot](https://t.me/superset_expense_bot) 💸
+
 - 📤 Open [link to bot](https://t.me/superset_expense_bot) and send him '/start' then '/setup', it configs bot for you with initial settings values
 - 📲 Run '/add' to add your first expense, follow instructions by bot
 - 🎉 Congrats, you recorded your first expense with Expense Bot!
@@ -25,6 +27,8 @@
   - 📝 Set your own templates for amounts/comments for each spending category
   - 🏷️ Adjust categories displaying in '/add' command
   - ⚡️ Add shortcuts for repeatable expenses accessible via '/shortcut' command afterward
+
+💸[Start using Expense Bot](https://t.me/superset_expense_bot) 💸
 
 ## How to deploy your own bot?
 
