@@ -86,7 +86,7 @@ You can deploy your bot on GCP platform using Compute Engine service.
   - Choose container optimized OS with docker >= v24.0.9 (for example, cos-stable-109-17800-147-22)
   - If you change port for Superset, make sure you open it in NIC firewall
 - 📥 Clone repo to your created VM
-- 🛠️ Create deploy script from example above and run it
+- 🛠️ Create deploy script from example above in the same parent directory like cloned repo and run it via ```source deploy_script.sh```
 
 Probably, you will need some adjustments, please reach out to me via Telegram (@romka_bauer), I will try to help.
 
