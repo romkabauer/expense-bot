@@ -96,6 +96,8 @@ Probably, you will need some adjustments, please reach out to me via Telegram [@
 - Every BI user created has its own RLS (Row-Level Security) policy which configured to display only this BI user's expenses in Apache Superset. More about RLS: https://superset.apache.org/docs/security/#row-level-security 
 
 ## Future plans:
+- Editing / Deleting expenses and shortcuts
+- Migrate to `freecurrencyapi` (more exchange rates available)
 - Family/Joint expenses in groups + shared access to BI for the group
 - Suggestion of new categories with ability for moderation by admins
 
