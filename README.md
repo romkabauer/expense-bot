@@ -88,7 +88,7 @@ You can deploy your bot on GCP platform using Compute Engine service.
 - 📥 Clone repo to your created VM
 - 🛠️ Create deploy script from example above in the same parent directory like cloned repo and run it via ```source deploy_script.sh```
 
-Probably, you will need some adjustments, please reach out to me via Telegram (@romka_bauer), I will try to help.
+Probably, you will need some adjustments, please reach out to me via Telegram [@romka_bauer](https://t.me/romka_bauer), I will try to help.
 
 ## Privacy remarks
 
