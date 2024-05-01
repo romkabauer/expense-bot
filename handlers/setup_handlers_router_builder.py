@@ -51,7 +51,7 @@ class SetupHandlersRouterBuilder(AbstractRouterBuilder):
         self.router.callback_query.register(self.handler_choose_base_currency,
                                             F.data == "base_currency")
         self.router.callback_query.register(self.handler_set_base_currency,
-                                            F.data.in_({"USD", "EUR", "TRY", "RUB"}))
+                                            F.data.in_({"USD", "EUR", "TRY", "GBP"}))
 
         self.router.message.register(self.handler_setup_analytics,
                                      Command('analytics'))
@@ -116,7 +116,7 @@ class SetupHandlersRouterBuilder(AbstractRouterBuilder):
 
         available_for_choosing = filter(
             lambda x: x != current_base_currency,
-            ["USD", "EUR", "TRY", "RUB"]
+            ["USD", "EUR", "TRY", "GBP"]
         )
         msg = await callback.message.reply(f"Current base currency: {current_base_currency}.\n\n" +
                                            interface_messages.SETTINGS_BASE_CURRENCY_CHOICE,
@@ -212,6 +212,7 @@ class SetupHandlersRouterBuilder(AbstractRouterBuilder):
                 ),
                 UsersProperties.user_id == callback.from_user.id
             ).first()[0].get(callback.data, ["no values set"])
+            current_value = [str(x) for x in current_value]
         await state.update_data({"setting_property_category": callback.data})
 
         msg = await callback.message.reply(f"Current values: {', '.join(current_value)}\n\n" +
