@@ -98,6 +98,7 @@ Probably, you will need some adjustments, please reach out to me via Telegram [@
 ## Future plans:
 - Editing / Deleting expenses and shortcuts
 - Migrate to `freecurrencyapi` (more exchange rates available)
+- Weekly summary on schedule
 - Family/Joint expenses in groups + shared access to BI for the group
 - Suggestion of new categories with ability for moderation by admins
 
