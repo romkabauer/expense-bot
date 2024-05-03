@@ -2,16 +2,19 @@ from abc import abstractmethod
 from typing import Any
 import re
 from datetime import datetime as dt
+from uuid import uuid4
 
 from aiogram import (
     types,
     Bot
 )
 from aiogram.fsm.context import FSMContext
+from sqlalchemy.orm import Session
 
 from resources.states import States
 from resources.currency_rate_extractor import CurrencyRateExtractor
 from resources import interface_messages
+from resources.keyboards import build_edit_mode_main_keyboard
 from database.database import DatabaseFacade
 from database.models import (
     Expenses,
@@ -89,7 +92,7 @@ class AbstractRouterBuilder:
                 .first()[0]
         return base_currency["base_currency"]
 
-    async def add_expense_to_db(self, message: types.Message, db, expense_data: dict):
+    async def add_expense_to_db(self, message: types.Message, db: Session, expense_data: dict):
         data = expense_data["db_payload"]
         user_id = data["user_id"]
         amount, currency, rates = await self.get_rates_on_expense_date(
@@ -97,7 +100,9 @@ class AbstractRouterBuilder:
             data["amount"],
             user_id
         )
+        expense_id = uuid4()
         db.add(Expenses(
+            expense_id=expense_id,
             user_id=user_id,
             category_id=db.query(Categories.category_id)
                           .filter(Categories.category_name == data["category"])
@@ -108,6 +113,7 @@ class AbstractRouterBuilder:
             rates=rates,
             comment=data["comment"],
         ))
+        return expense_id
 
     async def report_expense_details(self,
                                      message: types.Message | types.CallbackQuery,
@@ -125,11 +131,13 @@ class AbstractRouterBuilder:
         expense_date_formatted = dt.strptime(data["when"], '%Y-%m-%d') \
             .strftime("%B %d %Y (%A)")
         await message.reply(text=report_message +
+                                 f"    ID: {expense_data['expense_id']}\n"
                                  f"    Date: {expense_date_formatted}\n"
                                  f"    Category: {data['category']}\n"
                                  f"    Amount: {amount}\n"
                                  f"    Comment: {data['comment']}" +
                             str(details),
+                            reply_markup=build_edit_mode_main_keyboard(),
                             parse_mode="Markdown",
                             disable_notification=True)
 

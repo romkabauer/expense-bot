@@ -47,3 +47,17 @@ def build_listlike_keyboard(entities: list[str],
                                     max_items_in_a_row)
         ]
     return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
+def build_edit_mode_main_keyboard():
+    return build_listlike_keyboard(
+        ["edit", "delete"],
+        title_button_names=True
+    )
+
+def build_edit_mode_keyboard():
+    return build_listlike_keyboard(
+        entities=["edit_date", "edit_category", "edit_amount", "edit_comment"],
+        additional_items=["back"],
+        title_button_names=True
+    )

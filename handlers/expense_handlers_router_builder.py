@@ -1,4 +1,5 @@
 import time
+import re
 
 from aiogram import types, Router, F, Bot
 from aiogram.filters import Command, or_f
@@ -7,16 +8,20 @@ from datetime import datetime as dt, timedelta as td
 
 from handlers.abstract_router_builder import AbstractRouterBuilder
 from database.models import (
+    Expenses,
     Users,
     UsersProperties,
     Properties
 )
 from resources.keyboards import (
     build_date_keyboard,
+    build_edit_mode_main_keyboard,
+    build_edit_mode_keyboard,
     build_listlike_keyboard,
     build_reply_keyboard
 )
 from resources import interface_messages
+from resources.expense_attributes import ExpenseAttribute
 
 
 class ExpenseHandlersRouterBuilder(AbstractRouterBuilder):
@@ -28,13 +33,24 @@ class ExpenseHandlersRouterBuilder(AbstractRouterBuilder):
         self.router.message.register(self.handler_add_expense_start,
                                      Command(*['add', 'shortcut']))
 
+        self.router.message.register(self.handler_gen_msg,
+                                     Command('edit'))
+        self.router.callback_query.register(self.handler_set_editing_state,
+                                            F.data.in_({"edit"}))
+        self.router.callback_query.register(self.handler_edit_back,
+                                            self.state.edit_mode,
+                                            F.data.in_("back"))
+
         self.router.callback_query.register(self.handler_input_date,
                                             F.data.in_(
                                                 {"today", "yesterday", "other_date"}
                                             ))
         self.router.message.register(self.handler_parse_other_date,
                                      or_f(self.state.other_date_input,
-                                          self.state.shortcut))
+                                          self.state.shortcut,
+                                          self.state.edit_mode))
+        self.router.callback_query.register(self.handler_edit_date,
+                                            F.data.in_({"edit_date"}))
 
         self.router.callback_query.register(self.handler_ask_amount,
                                             self.state.reading_expense_category)
@@ -100,15 +116,23 @@ class ExpenseHandlersRouterBuilder(AbstractRouterBuilder):
                     "when": when_value
                 }
             })
-            await self.__ask_expense_category(callback, state)  # goes to the next step
+            await self.__route_user_after_date_enter(callback, state)  # goes to the next step
+
+            if await state.get_state() == self.state.edit_mode:
+                await state.clear()
+                return
         else:
             msg = await callback.message.reply(interface_messages.INPUT_DATE_FORMAT,
                                                reply=False,
                                                disable_notification=True)
             await self.save_init_instruction_msg_id(msg, state)
-            # starts date parsing workflow
-            await state.set_state(self.state.other_date_input) \
-                if not await state.get_state() == self.state.shortcut.state else None
+
+            if not await state.get_state():
+                # start date parsing workflow
+                await state.set_state(self.state.other_date_input)
+
+            if await state.get_state() == self.state.edit_mode:
+                return
 
         await callback.message.delete()
 
@@ -138,8 +162,33 @@ class ExpenseHandlersRouterBuilder(AbstractRouterBuilder):
                 "when": message.text
             }
         })
-        await self.__ask_expense_category(message, state)  # goes to the next step
+        await self.__route_user_after_date_enter(message, state)  # goes to the next step
+
+        if await state.get_state() == self.state.edit_mode:
+            await state.clear()
+
         await message.delete()
+
+    async def handler_gen_msg(self, message: types.Message, state: FSMContext):
+        await message.reply("Message to start editing workflow.", reply_markup=build_edit_mode_main_keyboard())
+        await message.delete()
+
+    async def handler_set_editing_state(self, callback: types.CallbackQuery, state: FSMContext):
+        await callback.message.edit_reply_markup(str(callback.message.message_id), build_edit_mode_keyboard())
+        await state.update_data({
+            "msg_under_edit": callback.message,
+            "expense_id": callback.message.message_id
+        })
+        await state.set_state(self.state.edit_mode)
+
+    async def handler_edit_date(self, callback: types.CallbackQuery, state: FSMContext):
+        await callback.message.edit_reply_markup(str(callback.message.message_id), build_date_keyboard())
+
+    async def handler_edit_back(self, callback: types.CallbackQuery, state: FSMContext):
+        s = await state.get_data()
+        msg = s.get("msg_under_edit")
+        await callback.message.edit_reply_markup(str(msg.message_id), build_edit_mode_main_keyboard())
+        await state.clear()
 
     async def handler_ask_amount(self, callback: types.CallbackQuery, state: FSMContext):
         """
@@ -211,13 +260,15 @@ class ExpenseHandlersRouterBuilder(AbstractRouterBuilder):
         state_data = await state.update_data(expense_data)
         try:
             with self.db.get_session() as db:
-                await self.add_expense_to_db(message, db, state_data)
+                expense_id = await self.add_expense_to_db(message, db, state_data)
                 db.commit()
+            expense_data["expense_id"] = expense_id
             await self.report_expense_details(
                 message=message,
                 expense_data=expense_data
             )
         except Exception as e:
+            expense_data["expense_id"] = "No ID assigned"
             await self.report_expense_details(
                 message=message,
                 expense_data=expense_data,
@@ -246,15 +297,16 @@ class ExpenseHandlersRouterBuilder(AbstractRouterBuilder):
                 }
             }
         with self.db.get_session() as db:
-            await self.add_expense_to_db(callback.message, db, expense_data)
+            expense_id = await self.add_expense_to_db(callback.message, db, expense_data)
             db.commit()
+        expense_data["expense_id"] = expense_id
         await self.report_expense_details(callback, expense_data)
         await self.delete_init_instruction(callback.message.chat.id, state, bot)
         await state.clear()
 
-    async def __ask_expense_category(self,
-                                     message: types.Message | types.CallbackQuery,
-                                     state: FSMContext):
+    async def __route_user_after_date_enter(self,
+                                            message: types.Message | types.CallbackQuery,
+                                            state: FSMContext):
         user_id = message.from_user.id
         message = message if isinstance(message, types.Message) \
             else message.message
@@ -270,6 +322,9 @@ class ExpenseHandlersRouterBuilder(AbstractRouterBuilder):
                     keyboard_layout = shortcuts.keys()
                     await state.update_data({"shortcuts_payloads": shortcuts})
                     await state.set_state(self.state.shortcut_parsing)
+                case self.state.edit_mode:
+                    await self.__edit_expense_attribute(state, ExpenseAttribute.DATE)
+                    return
                 case _:
                     reply_msg = interface_messages.ASK_EXPENSE_CATEGORY
                     keyboard_layout = db.query(UsersProperties.property_value) \
@@ -308,3 +363,36 @@ class ExpenseHandlersRouterBuilder(AbstractRouterBuilder):
                                   reply=False,
                                   disable_notification=True)
         await self.save_init_instruction_msg_id(msg, state)
+
+    async def __edit_expense_attribute(self,
+                                       state: FSMContext,
+                                       attribute: str):
+        editing_label = "(Edited)"
+        s = await state.get_data()
+        msg = s.get("msg_under_edit")
+        edited_data = {"expense_id": re.search(r'(?<=ID: ).*$', msg.text, flags=re.M).group(0)}
+        edited_text = msg.text
+
+        try:
+            with self.db.get_session() as db:
+                match attribute:
+                    case ExpenseAttribute.DATE:
+                        attribute_value = s["db_payload"]["when"]
+                        edited_data["spent_on"] = attribute_value
+                        edited_text = re.sub(r'(?<=Date: ).*$',
+                                             dt.strptime(attribute_value, '%Y-%m-%d').strftime("%B %d %Y (%A)"),
+                                             edited_text,
+                                             flags=re.M)
+                    case _:
+                        pass
+                db.bulk_update_mappings(Expenses, [edited_data])
+                db.commit()
+        except Exception as e:
+            editing_label = "(Editing failed, previous state remains)"
+            self.logger.log("__edit_expense_attribute", msg.from_user.id, str(e), "error")
+
+        await msg.edit_text(
+            text=edited_text + (f"\n{editing_label}" if not msg.text.endswith("(Edited)") else ""),
+            inline_message_id=str(msg.message_id),
+            reply_markup=build_edit_mode_main_keyboard()
+        )
