@@ -22,7 +22,7 @@
 - Run '/analytics' to create your user in BI tool
   - 🪪 Initial credentials will be issued for you as well as link to the BI interface
   - 🔐 Your password is not saved anywhere, and you can change it after first login
-### ⚙️ Personalize bot settings 
+### ⚙️ Personalize bot settings
 - You can adjust your settings via '/settings' command
   - 📝 Set your own templates for amounts/comments for each spending category
   - 🏷️ Adjust categories displaying in '/add' command
@@ -93,7 +93,7 @@ Probably, you will need some adjustments, please reach out to me via Telegram [@
 ## Privacy remarks
 
 - Separate BI user is being created for every bot user who issues command "/analytics".
-- Every BI user created has its own RLS (Row-Level Security) policy which configured to display only this BI user's expenses in Apache Superset. More about RLS: https://superset.apache.org/docs/security/#row-level-security 
+- Every BI user created has its own RLS (Row-Level Security) policy which configured to display only this BI user's expenses in Apache Superset. More about RLS: https://superset.apache.org/docs/security/#row-level-security
 
 ## Future plans:
 - Editing / Deleting expenses and shortcuts
