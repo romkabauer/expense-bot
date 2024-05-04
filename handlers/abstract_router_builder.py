@@ -1,6 +1,5 @@
 from abc import abstractmethod
 from typing import Any
-import requests as r
 import re
 from datetime import datetime as dt
 
@@ -11,6 +10,7 @@ from aiogram import (
 from aiogram.fsm.context import FSMContext
 
 from resources.states import States
+from resources.currency_rate_extractor import CurrencyRateExtractor
 from resources import interface_messages
 from database.database import DatabaseFacade
 from database.models import (
@@ -27,6 +27,7 @@ class AbstractRouterBuilder:
         self.logger = Logger()
         self.db = DatabaseFacade()
         self.router = None
+        self.supported_base_currencies = ["USD", "EUR", "RUB", "TRY", "GEL", "RSD", "AMD"]
 
     @abstractmethod
     def build_default_router(self):
@@ -72,9 +73,11 @@ class AbstractRouterBuilder:
         await state.set_data(data)
         return is_valid
 
-    @staticmethod
-    async def is_valid_expense_amount(message: str):
-        if not re.match(r"^\d+([.]\d+)?(.(USD|EUR|TRY|GBP|usd|eur|try|gbp))?$", message):
+    async def is_valid_expense_amount(self, message: str):
+        pattern = (r"^\d+([.]\d+)?(.("
+                   f"{'|'.join([f'{x}|{x.lower()}' for x in self.supported_base_currencies])}"
+                   r"))?$")
+        if not re.match(pattern, message):
             return False
         return True
 
@@ -132,20 +135,19 @@ class AbstractRouterBuilder:
 
     async def get_rates_on_expense_date(self, when: str, amount_with_currency: str, user_id: int):
         base_currency = await self.get_base_currency(user_id)
-        params = {
-            "base": base_currency,
-            "date": when
-        }
+        if base_currency not in self.supported_base_currencies:
+            base_currency = "USD"
 
-        res = r.get("https://api.vatcomply.com/rates", params=params)
-        rates = res.json()
+        rates = CurrencyRateExtractor(
+            self.supported_base_currencies,
+            base_currency,
+            when
+        ).extract_currency_rates()
+        source_data = amount_with_currency.split(' ')
 
-        if any([cur in amount_with_currency.upper() for cur in ['USD', 'EUR', 'RUB', 'TRY']]):
-            source_data = amount_with_currency.split(' ')
-            source_amount, source_currency = float(source_data[0]), source_data[1].upper()
-            return (source_amount,
-                    source_currency,
-                    {"base": rates["base"], "rates": rates["rates"]})
-        return (amount_with_currency,
-                base_currency,
+        if len(source_data) == 1:
+            source_data.append(base_currency)
+
+        return (float(source_data[0]),
+                source_data[1].upper(),
                 {"base": base_currency, "rates": rates["rates"]})

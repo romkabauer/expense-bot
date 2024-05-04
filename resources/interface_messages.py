@@ -13,7 +13,11 @@ SETTINGS_START = "🔤Choose setting to change:"
 SETTINGS_NOT_IMPLEMENTED = ("🙈Sorry, changes for this setting are not available yet! "
                             "But I'm working on it!")
 SETTINGS_CATEGORIES_CHOICE = "🔤Choose category to set values for:"
-SETTINGS_BASE_CURRENCY_CHOICE = "🔤Choose base (default) currency for your expenses:"
+SETTINGS_BASE_CURRENCY_CHOICE = ("🔤Choose base (default) currency for your expenses:\n"
+                                 "TRY - Turkish Lira\n"
+                                 "GEL - Georgian Lari\n"
+                                 "RSD - Serbian Dinar\n"
+                                 "AMD - Armenian Dram\n")
 SETTINGS_SET_SUCCESS = "✅Setting set successfully!"
 SETTINGS_SET_FAILURE = "⛔️Setting was not set!"
 SETTINGS_REQUEST_VALUES_FOR_CATEGORY = ("Please, specify default values for this category:\n"
@@ -26,23 +30,22 @@ SETTINGS_REQUEST_VALUES_FOR_CATEGORY = ("Please, specify default values for this
 
 ASK_EXPENSE_DATE = "📅When did you spend?"
 ASK_EXPENSE_CATEGORY = "🛍️What is the expense category?"
-ASK_SHORTCUT = "🔤Choose frequent payment shortcut:"
-ASK_EXPENSE_AMOUNT = "💵What is an amount paid?\n" \
-                     "Examples:\n"\
-                     "\t'100.11' - 100.11 units in your base currency will be recorded\n" \
-                     "\t'10 USD' - amount will be recorded along " \
-                     "with conversion rate on the expense date " \
-                     "(available currencies - USD, EUR, TRY, GBP)"
+ASK_SHORTCUT = "💵Choose frequent payment shortcut:"
+ASK_EXPENSE_AMOUNT = ("💵What is an amount paid?\n"
+                      "Examples:\n"
+                      "\t'100.11'\n"
+                      "\t'10 USD'\n"
+                      "\t'10 AMD'\n"
+                      "Amount will be recorded along "
+                      "with conversion rate on the expense date")
 ASK_COMMENT = "🔤Choose any comment to add or write custom one:"
 ASK_COMMENT_CUSTOM = "🔤Write custom comment:"
 
 INPUT_DATE_FORMAT = "🔤Input expense date in format '2023-10-13':"
 
-WRONG_EXPENSE_AMOUNT_FORMAT = "⛔️Wrong format for spending amount(s).\n" \
-                              "🔤Should contain only positive numbers " \
-                              "with . decimal separator and " \
-                              "USD, EUR, TRY, GBP, usd, eur, try or gbp " \
-                              "as currency label:"
+WRONG_EXPENSE_AMOUNT_FORMAT = ("⛔️Wrong format for spending amount(s).\n"
+                               "🔤Should contain only positive numbers "
+                               "with . decimal separator and currency label:")
 WRONG_DATE_FORMAT = "⛔️Wrong date format.\n"
 WRONG_DATE_TIMELINESS = "⛔️Input cannot contain future dates.\n"
 WRONG_NO_SHORTCUTS = "⛔No shortcuts registered. Please use /settings command to set one up."
@@ -50,5 +53,5 @@ WRONG_NO_SHORTCUTS = "⛔No shortcuts registered. Please use /settings command t
 SUCCESS_RECORD = "✅*Expense has been recorded!*\n\nRecorded data:\n"
 FAILED_RECORD = "⛔️*NOT recorded!*\n\nData to be recorded:\n"
 
-HEALTH_CHECK = "I'm alive, everything is perfect🙃 " \
-               "This message will be deleted in 2 seconds."
+HEALTH_CHECK = ("I'm alive, everything is perfect🙃 "
+                "This message will be deleted in 2 seconds.")
