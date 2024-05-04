@@ -51,7 +51,7 @@ class SetupHandlersRouterBuilder(AbstractRouterBuilder):
         self.router.callback_query.register(self.handler_choose_base_currency,
                                             F.data == "base_currency")
         self.router.callback_query.register(self.handler_set_base_currency,
-                                            F.data.in_({"USD", "EUR", "TRY", "GBP"}))
+                                            F.data.in_(self.supported_base_currencies))
 
         self.router.message.register(self.handler_setup_analytics,
                                      Command('analytics'))
@@ -116,7 +116,7 @@ class SetupHandlersRouterBuilder(AbstractRouterBuilder):
 
         available_for_choosing = filter(
             lambda x: x != current_base_currency,
-            ["USD", "EUR", "TRY", "GBP"]
+            self.supported_base_currencies
         )
         msg = await callback.message.reply(f"Current base currency: {current_base_currency}.\n\n" +
                                            interface_messages.SETTINGS_BASE_CURRENCY_CHOICE,
