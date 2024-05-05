@@ -21,12 +21,12 @@ SETTINGS_BASE_CURRENCY_CHOICE = ("🔤Choose base (default) currency for your ex
                                  "AMD - Armenian Dram\n")
 SETTINGS_SET_SUCCESS = "✅Setting set successfully!"
 SETTINGS_SET_FAILURE = "⛔️Setting was not set!"
-SETTINGS_REQUEST_VALUES_FOR_CATEGORY = ("Please, specify default values for this category:\n"
+SETTINGS_REQUEST_VALUES_FOR_CATEGORY = ("Please, specify default values for this category\.\n"
                                         "Examples:\n"
-                                        "\t'1, 1.50, 2, 3.99' - decimal parts of values for amounts "
+                                        "_1, 1\.50, 2, 3\.99_ \- decimal parts of values for amounts "
                                         "within categories should be divided by point, "
                                         "values itself should be divided by comma\n"
-                                        "\t'Cat1, Cat2, Cat 3, Cat_4' - values for comments "
+                                        "_Cat1, Cat2, Cat 3, Cat\_4_ \- values for comments "
                                         "within categories should be divided by comma")
 
 ASK_EXPENSE_DATE = "📅When did you spend?"

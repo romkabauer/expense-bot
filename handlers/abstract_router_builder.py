@@ -142,7 +142,7 @@ class AbstractRouterBuilder:
         reporting_data = (f"    Date: {expense_date_formatted}\n"
                           f"    Category: {data['category']}\n"
                           f"    Amount: {payload['amount']} {payload['currency']}\n"
-                          f"    Comment: {payload['comment']}")
+                          f"    Comment: `{payload['comment']}`")
         if not payload.get("error"):
             report_msg = interface_messages.SUCCESS_RECORD + reporting_data
             reply_markup = build_edit_mode_main_keyboard()
@@ -182,6 +182,8 @@ class AbstractRouterBuilder:
         msg: types.Message = s.get("msg_under_edit")
         edited_data = {}
         edited_text = msg.text
+        comment = re.search(r'(?<=Comment: ).*$', edited_text, flags=re.M).group(0)
+        edited_text = re.sub(r'(?<=Comment: ).*$', f"`{comment}`", edited_text, flags=re.M)
 
         try:
             with self.db.get_session() as db:
@@ -215,6 +217,13 @@ class AbstractRouterBuilder:
                                              f"{edited_data['amount']} {edited_data['currency']}",
                                              edited_text,
                                              flags=re.M)
+                    case ExpenseAttribute.COMMENT:
+                        comment = s["db_payload"]["comment"]
+                        edited_data["comment"] = comment
+                        edited_text = re.sub(r'(?<=Comment: ).*$',
+                                             f"`{edited_data['comment']}`",
+                                             edited_text,
+                                             flags=re.M)
                     case _:
                         pass
                 db.bulk_update_mappings(Expenses, [edited_data])
@@ -229,6 +238,7 @@ class AbstractRouterBuilder:
                   else edited_text.replace(EditingLabels.EDITED.value, editing_label)
                                   .replace(EditingLabels.EDIT_FAILED.value, editing_label)
                                   .replace(EditingLabels.DELETION_FAILED.value, editing_label)),
+            parse_mode="Markdown",
             inline_message_id=str(msg.message_id),
             reply_markup=build_edit_mode_main_keyboard()
         )

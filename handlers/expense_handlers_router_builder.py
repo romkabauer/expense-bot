@@ -53,7 +53,8 @@ class ExpenseHandlersRouterBuilder(AbstractRouterBuilder):
                                           self.state.edit_amount))
         # Input comment
         self.router.message.register(self.handler_parse_comment,
-                                     self.state.commenting)
+                                     or_f(self.state.commenting,
+                                          self.state.edit_comment))
 
         # Shortcuts
         self.router.callback_query.register(self.handler_parse_shortcut,
@@ -71,10 +72,11 @@ class ExpenseHandlersRouterBuilder(AbstractRouterBuilder):
         self.router.callback_query.register(self.handler_edit_amount,
                                             self.state.edit_mode,
                                             F.data.in_({"edit_amount"}))
+        self.router.callback_query.register(self.handler_edit_comment,
+                                            self.state.edit_mode,
+                                            F.data.in_({"edit_comment"}))
 
         self.router.callback_query.register(self.handler_back_to_main,
-                                            or_f(self.state.edit_mode,
-                                                 self.state.delete_mode),
                                             F.data.in_({"back", "cancel_deletion"}))
 
         self.router.callback_query.register(self.handler_set_deleting_state,
@@ -240,10 +242,13 @@ class ExpenseHandlersRouterBuilder(AbstractRouterBuilder):
         if await state.get_state() == self.state.edit_amount:
             await self.__route_user_by_state(message, state)
             await message.delete()
+            await state.clear()
             return
 
         await state.set_state(self.state.commenting)
-        await self.__ask_for_expense_comment(message, state)  # go to the next step
+        # go to the next step
+        msg = await self.__ask_for_expense_comment(message, state, message.from_user.id, cur_state_data["db_payload"]["category"])
+        await self.save_init_instruction_msg_id(msg, state)
         await message.delete()
 
     async def handler_parse_comment(self, message: types.Message, state: FSMContext, bot: Bot):
@@ -261,7 +266,12 @@ class ExpenseHandlersRouterBuilder(AbstractRouterBuilder):
             }
         }
         expense_data = await state.update_data(expense_data)
-        await self.report_expense_details(expense_data)
+
+        if await state.get_state() == self.state.edit_comment:
+            await self.__route_user_by_state(message, state)
+        else:
+            await self.report_expense_details(expense_data)
+
         await message.delete()
         await state.clear()
 
@@ -308,17 +318,13 @@ class ExpenseHandlersRouterBuilder(AbstractRouterBuilder):
             "editing_attribute": ExpenseAttribute.CATEGORY
         })
         await state.set_state(self.state.edit_category)
-        with self.db.get_session() as db:
-            await callback.message.edit_reply_markup(
-                str(callback.message.message_id),
-                build_listlike_keyboard(entities=db.query(UsersProperties.property_value)
-                                        .filter(UsersProperties.properties.has(
-                                            Properties.property_name == "categories"),
-                                            UsersProperties.user_id == callback.from_user.id)
-                                        .first()[0],
-                                        additional_items=["back"],
-                                        max_items_in_a_row=3)
-            )
+        await callback.message.edit_reply_markup(
+            str(callback.message.message_id),
+            build_listlike_keyboard(entities=await self.__get_user_property(callback.from_user.id,
+                                                                            "categories"),
+                                    additional_items=["back"],
+                                    max_items_in_a_row=3)
+        )
 
     async def handler_edit_amount(self, callback: types.CallbackQuery, state: FSMContext):
         await state.update_data({
@@ -328,6 +334,17 @@ class ExpenseHandlersRouterBuilder(AbstractRouterBuilder):
 
         category = re.search(r'(?<=Category: ).*$', callback.message.text, flags=re.M).group(0)
         msg = await self.__ask_for_expense_amount(callback.message, state, callback.message.chat.id, category)
+        await self.save_init_instruction_msg_id(msg, state)
+
+    async def handler_edit_comment(self, callback: types.CallbackQuery, state: FSMContext):
+        await state.update_data({
+            "editing_attribute": ExpenseAttribute.COMMENT
+        })
+
+        await state.set_state(self.state.edit_comment)
+
+        category = re.search(r'(?<=Category: ).*$', callback.message.text, flags=re.M).group(0)
+        msg = await self.__ask_for_expense_comment(callback.message, state, callback.message.chat.id, category)
         await self.save_init_instruction_msg_id(msg, state)
 
     async def handler_set_deleting_state(self, callback: types.CallbackQuery, state: FSMContext):
@@ -354,31 +371,22 @@ class ExpenseHandlersRouterBuilder(AbstractRouterBuilder):
         user_id = message.from_user.id
         message = message if isinstance(message, types.Message) \
             else message.message
-        with (self.db.get_session() as db):
-            match await state.get_state():
-                case self.state.shortcut.state:
-                    reply_msg = interface_messages.ASK_SHORTCUT
-                    shortcuts = db.query(UsersProperties.property_value) \
-                        .filter(UsersProperties.properties.has(
-                                    Properties.property_name == "shortcuts"),
-                                UsersProperties.user_id == user_id
-                        ).first()[0]
-                    keyboard_layout = shortcuts.keys()
-                    await state.update_data({"shortcuts_payloads": shortcuts})
-                    await state.set_state(self.state.shortcut_parsing)
-                case self.state.edit_date | self.state.edit_category \
-                     | self.state.edit_amount | self.state.edit_comment:
-                    s = await state.get_data()
-                    await self.edit_expense_attribute(state, s.get("editing_attribute"))
-                    return
-                case _:
-                    reply_msg = interface_messages.ASK_EXPENSE_CATEGORY
-                    keyboard_layout = db.query(UsersProperties.property_value) \
-                                        .filter(UsersProperties.properties.has(
-                                                    Properties.property_name == "categories"),
-                                                UsersProperties.user_id == user_id
-                                                ).first()[0]
-                    await state.set_state(self.state.reading_expense_category)
+        match await state.get_state():
+            case self.state.shortcut.state:
+                reply_msg = interface_messages.ASK_SHORTCUT
+                shortcuts = await self.__get_user_property(user_id, "shortcuts")
+                keyboard_layout = shortcuts.keys()
+                await state.update_data({"shortcuts_payloads": shortcuts})
+                await state.set_state(self.state.shortcut_parsing)
+            case self.state.edit_date | self.state.edit_category \
+                 | self.state.edit_amount | self.state.edit_comment:
+                s = await state.get_data()
+                await self.edit_expense_attribute(state, s.get("editing_attribute"))
+                return
+            case _:
+                reply_msg = interface_messages.ASK_EXPENSE_CATEGORY
+                keyboard_layout = await self.__get_user_property(user_id, "categories")
+                await state.set_state(self.state.reading_expense_category)
         msg = await message.reply(reply_msg,
                                   reply_markup=build_listlike_keyboard(
                                       entities=keyboard_layout,
@@ -387,41 +395,35 @@ class ExpenseHandlersRouterBuilder(AbstractRouterBuilder):
                                   disable_notification=True)
         await self.save_init_instruction_msg_id(msg, state)
 
-    async def __ask_for_expense_comment(self, message: types.Message, state: FSMContext):
-        cur_state_data = await state.get_data()
-        category = cur_state_data["db_payload"]["category"]
-        with self.db.get_session() as db:
-            comment_suggestions = db.query(UsersProperties.property_value).filter(
-                UsersProperties.properties.has(Properties.property_name == "comments"),
-                UsersProperties.user_id == message.from_user.id
-            ).first()[0]
-            comment_suggestions = comment_suggestions.get(category,
-                                                          comment_suggestions["default"])
-
-        reply_markup = build_reply_keyboard(
-            entities=comment_suggestions,
-            max_items_in_a_row=3) if comment_suggestions else None
-        commenting_msg = interface_messages.ASK_COMMENT \
-            if comment_suggestions else interface_messages.ASK_COMMENT_CUSTOM
+    async def __ask_for_expense_comment(self,
+                                        message: types.Message,
+                                        state: FSMContext,
+                                        user_id: int,
+                                        category_name: str = "default"):
+        comment_suggestions = await self.__get_user_property(user_id=user_id,
+                                                             property_name="comments",
+                                                             category_name=category_name)
+        if comment_suggestions:
+            reply_markup = build_reply_keyboard(entities=comment_suggestions, max_items_in_a_row=3)
+            commenting_msg = interface_messages.ASK_COMMENT
+        else:
+            reply_markup, commenting_msg = None, interface_messages.ASK_COMMENT_CUSTOM
 
         msg = await message.reply(text=commenting_msg,
                                   reply_markup=reply_markup,
                                   reply=False,
                                   disable_notification=True)
-        await self.save_init_instruction_msg_id(msg, state)
+        return msg
 
     async def __ask_for_expense_amount(self,
                                        message: types.Message,
                                        state: FSMContext,
                                        user_id: int,
                                        category_name: str = "default"):
-        with self.db.get_session() as db:
-            amounts = db.query(UsersProperties.property_value).filter(
-                UsersProperties.properties.has(Properties.property_name == "amounts"),
-                UsersProperties.user_id == user_id
-            ).first()[0]
-            category_amounts = amounts.get(category_name, amounts["default"])
-            await state.update_data({"cur_category_amounts": category_amounts})
+        category_amounts = await self.__get_user_property(user_id=user_id,
+                                                          property_name="amounts",
+                                                          category_name=category_name)
+        await state.update_data({"cur_category_amounts": category_amounts})
 
         msg = await message.reply(interface_messages.ASK_EXPENSE_AMOUNT,
                                   reply=False,
@@ -458,3 +460,13 @@ class ExpenseHandlersRouterBuilder(AbstractRouterBuilder):
                 inline_message_id=str(msg.message_id),
                 reply_markup=build_edit_mode_main_keyboard()
             )
+
+    async def __get_user_property(self, user_id: int, property_name: str, category_name: str = None):
+        with self.db.get_session() as db:
+            property_value = db.query(UsersProperties.property_value).filter(
+                UsersProperties.properties.has(Properties.property_name == property_name),
+                UsersProperties.user_id == user_id
+            ).first()[0]
+            if category_name:
+                return property_value.get(category_name, property_value["default"])
+            return property_value
