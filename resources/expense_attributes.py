@@ -1,5 +1,6 @@
 from enum import Enum
 
+
 class ExpenseAttribute(Enum):
     DATE = "DATE"
     CATEGORY = "CATEGORY"

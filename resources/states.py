@@ -17,3 +17,6 @@ class States(StatesGroup):
     settings_ask_shortcut_name = State()
 
     edit_mode = State()
+    edit_date = State()
+    edit_category = State()
+    delete_mode = State()

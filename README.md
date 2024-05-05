@@ -58,6 +58,7 @@ docker rm -f db && docker rm -f bi && docker rm -f bot \
         EXPENSE_BOT_TOKEN='your telegram bot token' \
         EXPENSE_BOT_DB_CONNECTION_STRING='postgresql://sample_pg_user:sample_pg_pass@db/expense_bot'\
         SUPERSET_UI_URL='http://localhost:8088' \
+        FREECURRENCYAPI_API_KEY='your_token' \
 && docker run --name db -p 5432:5432 \
         -e POSTGRES_USER=$POSTGRES_USER \
         -e POSTGRES_PASSWORD=$POSTGRES_PASSWORD \
@@ -79,6 +80,7 @@ docker rm -f db && docker rm -f bi && docker rm -f bot \
         -e SUPERSET_ADMIN_USERNAME=$SUPERSET_ADMIN_USERNAME \
         -e SUPERSET_ADMIN_PASSWORD=$SUPERSET_ADMIN_PASSWORD \
         -e SUPERSET_UI_URL=$SUPERSET_UI_URL \
+        -e FREECURRENCYAPI_API_KEY \
         --network expense-bot \
         -d expense-bot:0.1.0
 cd ..

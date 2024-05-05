@@ -1,5 +1,4 @@
 from abc import abstractmethod
-from typing import Any
 import re
 from datetime import datetime as dt
 from uuid import uuid4
@@ -9,7 +8,6 @@ from aiogram import (
     Bot
 )
 from aiogram.fsm.context import FSMContext
-from sqlalchemy.orm import Session
 
 from resources.states import States
 from resources.currency_rate_extractor import CurrencyRateExtractor
@@ -92,54 +90,69 @@ class AbstractRouterBuilder:
                 .first()[0]
         return base_currency["base_currency"]
 
-    async def add_expense_to_db(self, message: types.Message, db: Session, expense_data: dict):
-        data = expense_data["db_payload"]
-        user_id = data["user_id"]
+    async def __add_expense_to_db(self, expense_data: dict):
         amount, currency, rates = await self.get_rates_on_expense_date(
-            data["when"],
-            data["amount"],
-            user_id
+            expense_data["when"],
+            expense_data["amount"],
+            expense_data["user_id"]
         )
-        expense_id = uuid4()
-        db.add(Expenses(
-            expense_id=expense_id,
-            user_id=user_id,
-            category_id=db.query(Categories.category_id)
-                          .filter(Categories.category_name == data["category"])
-                          .first()[0],
-            spent_on=data["when"],
-            amount=amount,
-            currency=currency,
-            rates=rates,
-            comment=data["comment"],
-        ))
-        return expense_id
+        payload = {
+            "expense_id": expense_data["expense_id"],
+            "user_id": expense_data["user_id"],
+            "spent_on": expense_data["when"],
+            "amount": amount,
+            "currency": currency,
+            "rates": rates,
+            "comment": expense_data["comment"],
+        }
+        try:
+            with self.db.get_session() as db:
+                payload["category_id"] = db.query(Categories.category_id) \
+                        .filter(Categories.category_name == expense_data["category"]) \
+                        .first()[0]
+                db.add(Expenses(**payload))
+                db.commit()
+        except Exception as e:
+            payload["error"] = str(e)
+            self.logger.log(self, expense_data.get("message").from_user.id, str(payload))
 
-    async def report_expense_details(self,
-                                     message: types.Message | types.CallbackQuery,
-                                     expense_data: dict,
-                                     report_message: str = interface_messages.SUCCESS_RECORD,
-                                     details: Any = ""):
-        if isinstance(message, types.Message):
-            user_id, message = message.from_user.id, message
-        else:
-            user_id, message = message.from_user.id, message.message
-        self.logger.log(self, str(message.from_user.id), str(expense_data))
+        return payload
+
+    async def __add_message_id_to_expense(self, expense_id: str, message_id: int):
+        with self.db.get_session() as db:
+            db.bulk_update_mappings(Expenses, [{
+                "expense_id": expense_id,
+                "message_id": message_id
+            }])
+            db.commit()
+
+    async def report_expense_details(self, expense_data: dict):
         data = expense_data["db_payload"]
-        amount = f"{data['amount']} {await self.get_base_currency(user_id)}" \
-            if " " not in data['amount'] else f"{data['amount']}"
+        message: types.Message = data.get("message")
         expense_date_formatted = dt.strptime(data["when"], '%Y-%m-%d') \
             .strftime("%B %d %Y (%A)")
-        await message.reply(text=report_message +
-                                 f"    ID: {expense_data['expense_id']}\n"
-                                 f"    Date: {expense_date_formatted}\n"
-                                 f"    Category: {data['category']}\n"
-                                 f"    Amount: {amount}\n"
-                                 f"    Comment: {data['comment']}" +
-                            str(details),
-                            reply_markup=build_edit_mode_main_keyboard(),
-                            parse_mode="Markdown",
-                            disable_notification=True)
+        data["expense_id"] = uuid4()
+
+        payload = await self.__add_expense_to_db(data)
+        reporting_data = (f"    Date: {expense_date_formatted}\n"
+                          f"    Category: {data['category']}\n"
+                          f"    Amount: {payload['amount']} {payload['currency']}\n"
+                          f"    Comment: {payload['comment']}")
+        if not payload.get("error"):
+            report_msg = interface_messages.SUCCESS_RECORD + reporting_data
+            reply_markup = build_edit_mode_main_keyboard()
+        else:
+            report_msg = interface_messages.FAILED_RECORD + reporting_data \
+                + "\n" + str(payload.get("error"))
+            reply_markup = None
+        msg = await message.reply(text=report_msg,
+                                  reply_markup=reply_markup,
+                                  parse_mode="Markdown",
+                                  disable_notification=True)
+        self.logger.log(self, str(message.from_user.id), str(data))
+
+        if not payload.get("error"):
+            await self.__add_message_id_to_expense(data["expense_id"], msg.message_id)
 
     async def get_rates_on_expense_date(self, when: str, amount_with_currency: str, user_id: int):
         base_currency = await self.get_base_currency(user_id)
