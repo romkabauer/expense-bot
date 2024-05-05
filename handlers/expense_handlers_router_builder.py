@@ -11,8 +11,7 @@ from database.models import (
     Expenses,
     Users,
     UsersProperties,
-    Properties,
-    Categories
+    Properties
 )
 from resources.keyboards import (
     build_date_keyboard,
@@ -50,7 +49,8 @@ class ExpenseHandlersRouterBuilder(AbstractRouterBuilder):
                                                  self.state.edit_category))
         # Input amount
         self.router.message.register(self.handler_parse_amount,
-                                     self.state.entering_amount)
+                                     or_f(self.state.entering_amount,
+                                          self.state.edit_amount))
         # Input comment
         self.router.message.register(self.handler_parse_comment,
                                      self.state.commenting)
@@ -68,6 +68,9 @@ class ExpenseHandlersRouterBuilder(AbstractRouterBuilder):
         self.router.callback_query.register(self.handler_edit_category,
                                             self.state.edit_mode,
                                             F.data.in_({"edit_category"}))
+        self.router.callback_query.register(self.handler_edit_amount,
+                                            self.state.edit_mode,
+                                            F.data.in_({"edit_amount"}))
 
         self.router.callback_query.register(self.handler_back_to_main,
                                             or_f(self.state.edit_mode,
@@ -201,20 +204,11 @@ class ExpenseHandlersRouterBuilder(AbstractRouterBuilder):
             await state.clear()
             return
 
-        with self.db.get_session() as db:
-            amounts = db.query(UsersProperties.property_value).filter(
-                UsersProperties.properties.has(Properties.property_name == "amounts"),
-                UsersProperties.user_id == callback.from_user.id
-            ).first()[0]
-            category_amounts = amounts.get(callback.data, amounts["default"])
-            await state.update_data({"cur_category_amounts": category_amounts})
+        msg = await self.__ask_for_expense_amount(callback.message,
+                                                  state,
+                                                  callback.from_user.id,
+                                                  callback.data)
 
-        msg = await callback.message.reply(interface_messages.ASK_EXPENSE_AMOUNT,
-                                           reply=False,
-                                           reply_markup=build_reply_keyboard(
-                                               entities=category_amounts,
-                                               max_items_in_a_row=5),
-                                           disable_notification=True)
         await callback.message.delete()
         await self.save_init_instruction_msg_id(msg, state)
 
@@ -235,13 +229,20 @@ class ExpenseHandlersRouterBuilder(AbstractRouterBuilder):
                                           max_items_in_a_row=5),
                                       disable_notification=True)
             await self.save_init_instruction_msg_id(msg, state)
+            await message.delete()
+            return
+
+        await state.update_data({"db_payload": {
+            **cur_state_data.get("db_payload", {}),
+            "amount": message.text
+        }})
+
+        if await state.get_state() == self.state.edit_amount:
+            await self.__route_user_by_state(message, state)
+            await message.delete()
             return
 
         await state.set_state(self.state.commenting)
-        await state.update_data({"db_payload": {
-            **cur_state_data["db_payload"],
-            "amount": message.text
-        }})
         await self.__ask_for_expense_comment(message, state)  # go to the next step
         await message.delete()
 
@@ -253,7 +254,7 @@ class ExpenseHandlersRouterBuilder(AbstractRouterBuilder):
         state_data = await state.get_data()
         expense_data = {
             "db_payload": {
-                **state_data["db_payload"],
+                **state_data.get("db_payload", {}),
                 "user_id": message.from_user.id,
                 "message": message,
                 "comment": message.text
@@ -319,6 +320,16 @@ class ExpenseHandlersRouterBuilder(AbstractRouterBuilder):
                                         max_items_in_a_row=3)
             )
 
+    async def handler_edit_amount(self, callback: types.CallbackQuery, state: FSMContext):
+        await state.update_data({
+            "editing_attribute": ExpenseAttribute.AMOUNT
+        })
+        await state.set_state(self.state.edit_amount)
+
+        category = re.search(r'(?<=Category: ).*$', callback.message.text, flags=re.M).group(0)
+        msg = await self.__ask_for_expense_amount(callback.message, state, callback.message.chat.id, category)
+        await self.save_init_instruction_msg_id(msg, state)
+
     async def handler_set_deleting_state(self, callback: types.CallbackQuery, state: FSMContext):
         await callback.message.edit_reply_markup(str(callback.message.message_id), build_listlike_keyboard(
             ["confirm_deletion", "cancel_deletion"], title_button_names=True
@@ -343,7 +354,7 @@ class ExpenseHandlersRouterBuilder(AbstractRouterBuilder):
         user_id = message.from_user.id
         message = message if isinstance(message, types.Message) \
             else message.message
-        with self.db.get_session() as db:
+        with (self.db.get_session() as db):
             match await state.get_state():
                 case self.state.shortcut.state:
                     reply_msg = interface_messages.ASK_SHORTCUT
@@ -355,17 +366,18 @@ class ExpenseHandlersRouterBuilder(AbstractRouterBuilder):
                     keyboard_layout = shortcuts.keys()
                     await state.update_data({"shortcuts_payloads": shortcuts})
                     await state.set_state(self.state.shortcut_parsing)
-                case self.state.edit_date | self.state.edit_category:
+                case self.state.edit_date | self.state.edit_category \
+                     | self.state.edit_amount | self.state.edit_comment:
                     s = await state.get_data()
-                    await self.__edit_expense_attribute(state, s.get("editing_attribute"))
+                    await self.edit_expense_attribute(state, s.get("editing_attribute"))
                     return
                 case _:
                     reply_msg = interface_messages.ASK_EXPENSE_CATEGORY
                     keyboard_layout = db.query(UsersProperties.property_value) \
-                        .filter(UsersProperties.properties.has(
-                                    Properties.property_name == "categories"),
-                                UsersProperties.user_id == user_id
-                        ).first()[0]
+                                        .filter(UsersProperties.properties.has(
+                                                    Properties.property_name == "categories"),
+                                                UsersProperties.user_id == user_id
+                                                ).first()[0]
                     await state.set_state(self.state.reading_expense_category)
         msg = await message.reply(reply_msg,
                                   reply_markup=build_listlike_keyboard(
@@ -398,54 +410,26 @@ class ExpenseHandlersRouterBuilder(AbstractRouterBuilder):
                                   disable_notification=True)
         await self.save_init_instruction_msg_id(msg, state)
 
-    async def __edit_expense_attribute(self,
+    async def __ask_for_expense_amount(self,
+                                       message: types.Message,
                                        state: FSMContext,
-                                       attribute: ExpenseAttribute):
-        editing_label = EditingLabels.EDITED.value
-        s = await state.get_data()
-        msg: types.Message = s.get("msg_under_edit")
-        edited_data = {}
-        edited_text = msg.text
+                                       user_id: int,
+                                       category_name: str = "default"):
+        with self.db.get_session() as db:
+            amounts = db.query(UsersProperties.property_value).filter(
+                UsersProperties.properties.has(Properties.property_name == "amounts"),
+                UsersProperties.user_id == user_id
+            ).first()[0]
+            category_amounts = amounts.get(category_name, amounts["default"])
+            await state.update_data({"cur_category_amounts": category_amounts})
 
-        try:
-            with self.db.get_session() as db:
-                expense_id = db.query(Expenses.expense_id).filter(
-                    Expenses.user_id == msg.chat.id,
-                    Expenses.message_id == msg.message_id
-                ).first()[0]
-                edited_data["expense_id"] = expense_id
-                match attribute:
-                    case ExpenseAttribute.DATE:
-                        attribute_value = s["db_payload"]["when"]
-                        edited_data["spent_on"] = attribute_value
-                        edited_text = re.sub(r'(?<=Date: ).*$',
-                                             dt.strptime(attribute_value, '%Y-%m-%d').strftime("%B %d %Y (%A)"),
-                                             edited_text,
-                                             flags=re.M)
-                    case ExpenseAttribute.CATEGORY:
-                        attribute_value = s["db_payload"]["category"]
-                        edited_data["category_id"] = db.query(Categories.category_id) \
-                            .filter(Categories.category_name == attribute_value) \
-                            .first()[0]
-                        edited_text = re.sub(r'(?<=Category: ).*$', attribute_value, edited_text, flags=re.M)
-                    case _:
-                        pass
-                db.bulk_update_mappings(Expenses, [edited_data])
-                db.commit()
-        except Exception as e:
-            editing_label = EditingLabels.EDIT_FAILED.value
-            self.logger.log("__edit_expense_attribute", msg.from_user.id, str(e) + f" {msg}", "error")
-
-        await msg.edit_text(
-            text=(edited_text + f"\n{editing_label}"
-                  if not any(msg.text.endswith(x.value) for x in EditingLabels)
-                  else edited_text
-                       .replace(EditingLabels.EDITED.value, editing_label)
-                       .replace(EditingLabels.EDIT_FAILED.value, editing_label)
-                       .replace(EditingLabels.DELETION_FAILED.value, editing_label)),
-            inline_message_id=str(msg.message_id),
-            reply_markup=build_edit_mode_main_keyboard()
-        )
+        msg = await message.reply(interface_messages.ASK_EXPENSE_AMOUNT,
+                                  reply=False,
+                                  reply_markup=build_reply_keyboard(
+                                      entities=category_amounts,
+                                      max_items_in_a_row=5),
+                                  disable_notification=True)
+        return msg
 
     async def __delete_expense(self,
                                state: FSMContext) -> str:

@@ -19,4 +19,6 @@ class States(StatesGroup):
     edit_mode = State()
     edit_date = State()
     edit_category = State()
+    edit_amount = State()
+    edit_comment = State()
     delete_mode = State()
