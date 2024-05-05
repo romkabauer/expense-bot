@@ -16,6 +16,7 @@ class Expenses(Base):
     __tablename__ = "expenses"
     expense_id = Column("id", UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column("user_id", BigInteger, ForeignKey("users.id"), nullable=False)
+    message_id = Column("message_id", BigInteger, nullable=False)
     category_id = Column("category_id", UUID(as_uuid=True), ForeignKey("categories.id"), nullable=False)
     spent_on = Column("spent_on", Date, nullable=False, default=func.current_date)
     amount = Column("amount", Float, nullable=False)
@@ -32,6 +33,7 @@ class Expenses(Base):
         return dict(
             expense_id=self.expense_id,
             user_id=self.user_id,
+            message_id=self.message_id,
             category_id=self.category_id,
             spent_on=self.spent_on,
             amount=self.amount,

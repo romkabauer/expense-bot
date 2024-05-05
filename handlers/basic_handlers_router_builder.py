@@ -39,6 +39,6 @@ class BasicHandlersRouterBuilder(AbstractRouterBuilder):
                 await bot.delete_message(chat_id=chat_id,
                                          message_id=data['init_instruction'])
             except Exception as e:
-                self.logger.log(self, message.from_user.id, e, level="error")
+                self.logger.log(self, message.from_user.id, str(e), level="error")
         await state.clear()
         await message.delete()

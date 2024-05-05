@@ -1,4 +1,5 @@
 import time
+import re
 
 from aiogram import (
     types,
@@ -212,11 +213,12 @@ class SetupHandlersRouterBuilder(AbstractRouterBuilder):
                 ),
                 UsersProperties.user_id == callback.from_user.id
             ).first()[0].get(callback.data, ["no values set"])
-            current_value = [str(x) for x in current_value]
+            current_value = [self.__escape_markdown(str(x), 2) for x in current_value]
         await state.update_data({"setting_property_category": callback.data})
 
-        msg = await callback.message.reply(f"Current values: {', '.join(current_value)}\n\n" +
+        msg = await callback.message.reply(f"Current values: `{', '.join(current_value)}`\n\n" +
                                            interface_messages.SETTINGS_REQUEST_VALUES_FOR_CATEGORY,
+                                           parse_mode="MarkdownV2",
                                            disable_notification=True)
         await callback.message.delete()
         await self.save_init_instruction_msg_id(msg, state)
@@ -473,3 +475,31 @@ class SetupHandlersRouterBuilder(AbstractRouterBuilder):
                 user_id=user_id,
                 property_value=property_value
             ))
+
+    @staticmethod
+    def __escape_markdown(text: str, version: int = 1, entity_type: str = None) -> str:
+        """
+        Helper function to escape telegram markup symbols.
+
+        Args:
+            text (:obj:`str`): The text.
+            version (:obj:`int` | :obj:`str`): Use to specify the version of telegrams Markdown.
+                Either ``1`` or ``2``. Defaults to ``1``.
+            entity_type (:obj:`str`, optional): For the entity types ``PRE``, ``CODE`` and the link
+                part of ``TEXT_LINKS``, only certain characters need to be escaped in ``MarkdownV2``.
+                See the official API documentation for details. Only valid in combination with
+                ``version=2``, will be ignored else.
+        """
+        if int(version) == 1:
+            escape_chars = r'_*`['
+        elif int(version) == 2:
+            if entity_type in ['pre', 'code']:
+                escape_chars = r'\`'
+            elif entity_type == 'text_link':
+                escape_chars = r'\)'
+            else:
+                escape_chars = r'_*[]()~`>#+-=|{}.!'
+        else:
+            raise ValueError('Markdown version must be either 1 or 2!')
+
+        return re.sub(f'([{re.escape(escape_chars)}])', r'\\\1', text)

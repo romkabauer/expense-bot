@@ -8,9 +8,17 @@ class States(StatesGroup):
     commenting = State()
     shortcut = State()
     shortcut_parsing = State()
+
     settings_request_values_for_category = State()
     settings_parse_values_for_category = State()
     settings_choosing_active_categories = State()
     settings_ask_shortcut_amount = State()
     settings_parse_shortcut_amount = State()
     settings_ask_shortcut_name = State()
+
+    edit_mode = State()
+    edit_date = State()
+    edit_category = State()
+    edit_amount = State()
+    edit_comment = State()
+    delete_mode = State()

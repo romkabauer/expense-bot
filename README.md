@@ -58,6 +58,7 @@ docker rm -f db && docker rm -f bi && docker rm -f bot \
         EXPENSE_BOT_TOKEN='your telegram bot token' \
         EXPENSE_BOT_DB_CONNECTION_STRING='postgresql://sample_pg_user:sample_pg_pass@db/expense_bot'\
         SUPERSET_UI_URL='http://localhost:8088' \
+        FREECURRENCYAPI_API_KEY='your_token' \
 && docker run --name db -p 5432:5432 \
         -e POSTGRES_USER=$POSTGRES_USER \
         -e POSTGRES_PASSWORD=$POSTGRES_PASSWORD \
@@ -79,6 +80,7 @@ docker rm -f db && docker rm -f bi && docker rm -f bot \
         -e SUPERSET_ADMIN_USERNAME=$SUPERSET_ADMIN_USERNAME \
         -e SUPERSET_ADMIN_PASSWORD=$SUPERSET_ADMIN_PASSWORD \
         -e SUPERSET_UI_URL=$SUPERSET_UI_URL \
+        -e FREECURRENCYAPI_API_KEY \
         --network expense-bot \
         -d expense-bot:0.1.0
 cd ..
@@ -101,8 +103,6 @@ Probably, you will need some adjustments, please reach out to me via Telegram [@
 - Every BI user created has its own RLS (Row-Level Security) policy which configured to display only this BI user's expenses in Apache Superset. More about RLS: https://superset.apache.org/docs/security/#row-level-security
 
 ## Future plans:
-- Editing / Deleting expenses and shortcuts
-- Migrate to `freecurrencyapi` (more exchange rates available)
 - Weekly summary on schedule
 - Family/Joint expenses in groups + shared access to BI for the group
 - Suggestion of new categories with ability for moderation by admins

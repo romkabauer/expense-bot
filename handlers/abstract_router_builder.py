@@ -1,7 +1,7 @@
 from abc import abstractmethod
-from typing import Any
 import re
 from datetime import datetime as dt
+from uuid import uuid4
 
 from aiogram import (
     types,
@@ -12,6 +12,9 @@ from aiogram.fsm.context import FSMContext
 from resources.states import States
 from resources.currency_rate_extractor import CurrencyRateExtractor
 from resources import interface_messages
+from resources.editing_labels import EditingLabels
+from resources.expense_attributes import ExpenseAttribute
+from resources.keyboards import build_edit_mode_main_keyboard
 from database.database import DatabaseFacade
 from database.models import (
     Expenses,
@@ -28,6 +31,7 @@ class AbstractRouterBuilder:
         self.db = DatabaseFacade()
         self.router = None
         self.supported_base_currencies = ["USD", "EUR", "RUB", "TRY", "GEL", "RSD", "AMD"]
+        self.currency_rate_extractor = CurrencyRateExtractor(self.supported_base_currencies)
 
     @abstractmethod
     def build_default_router(self):
@@ -48,8 +52,10 @@ class AbstractRouterBuilder:
 
     @staticmethod
     async def delete_init_instruction(chat_id: int, state: FSMContext, bot: Bot):
-        init_msg_id = await state.get_data()
-        await bot.delete_message(chat_id=chat_id, message_id=init_msg_id['init_instruction'])
+        data = await state.get_data()
+        init_msg_id = data.get('init_instruction')
+        if init_msg_id:
+            await bot.delete_message(chat_id=chat_id, message_id=init_msg_id)
 
     async def is_valid_date_format(self, message: types.Message, state: FSMContext, bot: Bot):
         is_valid = True
@@ -89,60 +95,76 @@ class AbstractRouterBuilder:
                 .first()[0]
         return base_currency["base_currency"]
 
-    async def add_expense_to_db(self, message: types.Message, db, expense_data: dict):
-        data = expense_data["db_payload"]
-        user_id = data["user_id"]
+    async def __add_expense_to_db(self, expense_data: dict):
         amount, currency, rates = await self.get_rates_on_expense_date(
-            data["when"],
-            data["amount"],
-            user_id
+            expense_data["when"],
+            expense_data["amount"],
+            expense_data["user_id"]
         )
-        db.add(Expenses(
-            user_id=user_id,
-            category_id=db.query(Categories.category_id)
-                          .filter(Categories.category_name == data["category"])
-                          .first()[0],
-            spent_on=data["when"],
-            amount=amount,
-            currency=currency,
-            rates=rates,
-            comment=data["comment"],
-        ))
+        payload = {
+            "expense_id": expense_data["expense_id"],
+            "user_id": expense_data["user_id"],
+            "spent_on": expense_data["when"],
+            "amount": amount,
+            "currency": currency,
+            "rates": rates,
+            "comment": expense_data["comment"],
+        }
+        try:
+            with self.db.get_session() as db:
+                payload["category_id"] = db.query(Categories.category_id) \
+                        .filter(Categories.category_name == expense_data["category"]) \
+                        .first()[0]
+                db.add(Expenses(**payload))
+                db.commit()
+        except Exception as e:
+            payload["error"] = str(e)
+            self.logger.log(self, expense_data.get("message").from_user.id, str(payload))
 
-    async def report_expense_details(self,
-                                     message: types.Message | types.CallbackQuery,
-                                     expense_data: dict,
-                                     report_message: str = interface_messages.SUCCESS_RECORD,
-                                     details: Any = ""):
-        if isinstance(message, types.Message):
-            user_id, message = message.from_user.id, message
-        else:
-            user_id, message = message.from_user.id, message.message
-        self.logger.log(self, str(message.from_user.id), str(expense_data))
+        return payload
+
+    async def __add_message_id_to_expense(self, expense_id: str, message_id: int):
+        with self.db.get_session() as db:
+            db.bulk_update_mappings(Expenses, [{
+                "expense_id": expense_id,
+                "message_id": message_id
+            }])
+            db.commit()
+
+    async def report_expense_details(self, expense_data: dict):
         data = expense_data["db_payload"]
-        amount = f"{data['amount']} {await self.get_base_currency(user_id)}" \
-            if " " not in data['amount'] else f"{data['amount']}"
+        message: types.Message = data.get("message")
         expense_date_formatted = dt.strptime(data["when"], '%Y-%m-%d') \
             .strftime("%B %d %Y (%A)")
-        await message.reply(text=report_message +
-                                 f"    Date: {expense_date_formatted}\n"
-                                 f"    Category: {data['category']}\n"
-                                 f"    Amount: {amount}\n"
-                                 f"    Comment: {data['comment']}" +
-                            str(details),
-                            parse_mode="Markdown",
-                            disable_notification=True)
+        data["expense_id"] = uuid4()
+
+        payload = await self.__add_expense_to_db(data)
+        reporting_data = (f"    Date: {expense_date_formatted}\n"
+                          f"    Category: {data['category']}\n"
+                          f"    Amount: {payload['amount']} {payload['currency']}\n"
+                          f"    Comment: `{payload['comment']}`")
+        if not payload.get("error"):
+            report_msg = interface_messages.SUCCESS_RECORD + reporting_data
+            reply_markup = build_edit_mode_main_keyboard()
+        else:
+            report_msg = interface_messages.FAILED_RECORD + reporting_data \
+                + "\n" + str(payload.get("error"))
+            reply_markup = None
+        msg = await message.reply(text=report_msg,
+                                  reply_markup=reply_markup,
+                                  parse_mode="Markdown",
+                                  disable_notification=True)
+        self.logger.log(self, str(message.from_user.id), str(data))
+
+        if not payload.get("error"):
+            await self.__add_message_id_to_expense(data["expense_id"], msg.message_id)
 
     async def get_rates_on_expense_date(self, when: str, amount_with_currency: str, user_id: int):
         base_currency = await self.get_base_currency(user_id)
         if base_currency not in self.supported_base_currencies:
             base_currency = "USD"
 
-        rates = CurrencyRateExtractor(
-            self.supported_base_currencies,
-            base_currency,
-            when
-        ).extract_currency_rates()
+        rates = self.currency_rate_extractor.extract_currency_rates(base_currency, when)
         source_data = amount_with_currency.split(' ')
 
         if len(source_data) == 1:
@@ -151,3 +173,72 @@ class AbstractRouterBuilder:
         return (float(source_data[0]),
                 source_data[1].upper(),
                 {"base": base_currency, "rates": rates["rates"]})
+
+    async def edit_expense_attribute(self,
+                                     state: FSMContext,
+                                     attribute: ExpenseAttribute):
+        editing_label = EditingLabels.EDITED.value
+        s = await state.get_data()
+        msg: types.Message = s.get("msg_under_edit")
+        edited_data = {}
+        edited_text = msg.text
+        comment = re.search(r'(?<=Comment: ).*$', edited_text, flags=re.M).group(0)
+        edited_text = re.sub(r'(?<=Comment: ).*$', f"`{comment}`", edited_text, flags=re.M)
+
+        try:
+            with self.db.get_session() as db:
+                expense_id = db.query(Expenses.expense_id).filter(
+                    Expenses.user_id == msg.chat.id,
+                    Expenses.message_id == msg.message_id
+                ).first()[0]
+                edited_data["expense_id"] = expense_id
+                match attribute:
+                    case ExpenseAttribute.DATE:
+                        attribute_value = s["db_payload"]["when"]
+                        edited_data["rates"] = self.currency_rate_extractor.extract_currency_rates(
+                            await self.get_base_currency(msg.chat.id), attribute_value)
+                        edited_data["spent_on"] = attribute_value
+                        edited_text = re.sub(r'(?<=Date: ).*$',
+                                             dt.strptime(attribute_value, '%Y-%m-%d').strftime("%B %d %Y (%A)"),
+                                             edited_text,
+                                             flags=re.M)
+                    case ExpenseAttribute.CATEGORY:
+                        attribute_value = s["db_payload"]["category"]
+                        edited_data["category_id"] = db.query(Categories.category_id) \
+                            .filter(Categories.category_name == attribute_value) \
+                            .first()[0]
+                        edited_text = re.sub(r'(?<=Category: ).*$', attribute_value, edited_text, flags=re.M)
+                    case ExpenseAttribute.AMOUNT:
+                        base_currency = await self.get_base_currency(msg.chat.id)
+                        amount = s["db_payload"]["amount"].split(" ")
+                        edited_data["amount"] = amount[0]
+                        edited_data["currency"] = base_currency if len(amount) == 1 else amount[1].upper()
+                        edited_text = re.sub(r'(?<=Amount: ).*$',
+                                             f"{edited_data['amount']} {edited_data['currency']}",
+                                             edited_text,
+                                             flags=re.M)
+                    case ExpenseAttribute.COMMENT:
+                        comment = s["db_payload"]["comment"]
+                        edited_data["comment"] = comment
+                        edited_text = re.sub(r'(?<=Comment: ).*$',
+                                             f"`{edited_data['comment']}`",
+                                             edited_text,
+                                             flags=re.M)
+                    case _:
+                        pass
+                db.bulk_update_mappings(Expenses, [edited_data])
+                db.commit()
+        except Exception as e:
+            editing_label = EditingLabels.EDIT_FAILED.value
+            self.logger.log("__edit_expense_attribute", str(msg.from_user.id), str(e) + f" {msg}", "error")
+
+        await msg.edit_text(
+            text=(edited_text + f"\n{editing_label}"
+                  if not any(msg.text.endswith(x.value) for x in EditingLabels)
+                  else edited_text.replace(EditingLabels.EDITED.value, editing_label)
+                                  .replace(EditingLabels.EDIT_FAILED.value, editing_label)
+                                  .replace(EditingLabels.DELETION_FAILED.value, editing_label)),
+            parse_mode="Markdown",
+            inline_message_id=str(msg.message_id),
+            reply_markup=build_edit_mode_main_keyboard()
+        )
