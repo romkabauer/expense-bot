@@ -4,6 +4,7 @@ import re
 from aiogram import types, Router, F, Bot
 from aiogram.filters import Command, or_f
 from aiogram.fsm.context import FSMContext
+from aiogram.exceptions import TelegramBadRequest
 from datetime import datetime as dt, timedelta as td
 
 from handlers.abstract_router_builder import AbstractRouterBuilder
@@ -46,7 +47,8 @@ class ExpenseHandlersRouterBuilder(AbstractRouterBuilder):
         # Input category
         self.router.callback_query.register(self.handler_parse_category,
                                             or_f(self.state.reading_expense_category,
-                                                 self.state.edit_category))
+                                                 self.state.edit_category),
+                                            F.data.not_in({"back"}))
         # Input amount
         self.router.message.register(self.handler_parse_amount,
                                      or_f(self.state.entering_amount,
@@ -359,11 +361,14 @@ class ExpenseHandlersRouterBuilder(AbstractRouterBuilder):
         if is_success:
             await callback.message.delete()
 
-    async def handler_back_to_main(self, callback: types.CallbackQuery, state: FSMContext):
-        s = await state.get_data()
-        msg = s.get("msg_under_edit")
-        await callback.message.edit_reply_markup(str(msg.message_id), build_edit_mode_main_keyboard())
+    async def handler_back_to_main(self, callback: types.CallbackQuery, state: FSMContext, bot: Bot):
+        await self.delete_init_instruction(callback.message.chat.id, state, bot)
         await state.clear()
+        try:
+            await callback.message.edit_reply_markup(str(callback.message.message_id),
+                                                     build_edit_mode_main_keyboard())
+        except TelegramBadRequest:
+            pass
 
     async def __route_user_by_state(self,
                                     message: types.Message | types.CallbackQuery,
@@ -408,6 +413,10 @@ class ExpenseHandlersRouterBuilder(AbstractRouterBuilder):
             commenting_msg = interface_messages.ASK_COMMENT
         else:
             reply_markup, commenting_msg = None, interface_messages.ASK_COMMENT_CUSTOM
+
+        if await state.get_state() == self.state.edit_comment:
+            commenting_msg = "🔶You can copy current comment tapping on it.\n\n" \
+                             + commenting_msg
 
         msg = await message.reply(text=commenting_msg,
                                   reply_markup=reply_markup,
