@@ -192,40 +192,14 @@ class AbstractRouterBuilder:
                     Expenses.message_id == msg.message_id
                 ).first()[0]
                 edited_data["expense_id"] = expense_id
-                match attribute:
-                    case ExpenseAttribute.DATE:
-                        attribute_value = s["db_payload"]["when"]
-                        edited_data["rates"] = self.currency_rate_extractor.extract_currency_rates(
-                            await self.get_base_currency(msg.chat.id), attribute_value)
-                        edited_data["spent_on"] = attribute_value
-                        edited_text = re.sub(r'(?<=Date: ).*$',
-                                             dt.strptime(attribute_value, '%Y-%m-%d').strftime("%B %d %Y (%A)"),
-                                             edited_text,
-                                             flags=re.M)
-                    case ExpenseAttribute.CATEGORY:
-                        attribute_value = s["db_payload"]["category"]
-                        edited_data["category_id"] = db.query(Categories.category_id) \
-                            .filter(Categories.category_name == attribute_value) \
-                            .first()[0]
-                        edited_text = re.sub(r'(?<=Category: ).*$', attribute_value, edited_text, flags=re.M)
-                    case ExpenseAttribute.AMOUNT:
-                        base_currency = await self.get_base_currency(msg.chat.id)
-                        amount = s["db_payload"]["amount"].split(" ")
-                        edited_data["amount"] = amount[0]
-                        edited_data["currency"] = base_currency if len(amount) == 1 else amount[1].upper()
-                        edited_text = re.sub(r'(?<=Amount: ).*$',
-                                             f"{edited_data['amount']} {edited_data['currency']}",
-                                             edited_text,
-                                             flags=re.M)
-                    case ExpenseAttribute.COMMENT:
-                        comment = s["db_payload"]["comment"]
-                        edited_data["comment"] = comment
-                        edited_text = re.sub(r'(?<=Comment: ).*$',
-                                             f"`{edited_data['comment']}`",
-                                             edited_text,
-                                             flags=re.M)
-                    case _:
-                        pass
+                edited_data, edited_text = await self.__adjust_edited_data(
+                    db_session=db,
+                    attribute=attribute,
+                    state_data=s,
+                    edited_data=edited_data,
+                    edited_text=edited_text,
+                    base_currency=await self.get_base_currency(msg.chat.id)
+                )
                 db.bulk_update_mappings(Expenses, [edited_data])
                 db.commit()
         except Exception as e:
@@ -242,3 +216,46 @@ class AbstractRouterBuilder:
             inline_message_id=str(msg.message_id),
             reply_markup=build_edit_mode_main_keyboard()
         )
+
+    async def __adjust_edited_data(self,
+                                   db_session,
+                                   attribute: ExpenseAttribute,
+                                   state_data: dict,
+                                   edited_data: dict,
+                                   edited_text: str,
+                                   base_currency: str):
+        match attribute:
+            case ExpenseAttribute.DATE:
+                attribute_value = state_data["db_payload"]["when"]
+                edited_data["rates"] = self.currency_rate_extractor.extract_currency_rates(
+                    base_currency, attribute_value)
+                edited_data["spent_on"] = attribute_value
+                edited_text = re.sub(r'(?<=Date: ).*$',
+                                     dt.strptime(attribute_value, '%Y-%m-%d').strftime("%B %d %Y (%A)"),
+                                     edited_text,
+                                     flags=re.M)
+            case ExpenseAttribute.CATEGORY:
+                attribute_value = state_data["db_payload"]["category"]
+                edited_data["category_id"] = db_session.query(Categories.category_id) \
+                    .filter(Categories.category_name == attribute_value) \
+                    .first()[0]
+                edited_text = re.sub(r'(?<=Category: ).*$', attribute_value, edited_text, flags=re.M)
+            case ExpenseAttribute.AMOUNT:
+                amount = state_data["db_payload"]["amount"].split(" ")
+                edited_data["amount"] = amount[0]
+                edited_data["currency"] = base_currency if len(amount) == 1 else amount[1].upper()
+                edited_text = re.sub(r'(?<=Amount: ).*$',
+                                     f"{edited_data['amount']} {edited_data['currency']}",
+                                     edited_text,
+                                     flags=re.M)
+            case ExpenseAttribute.COMMENT:
+                comment = state_data["db_payload"]["comment"]
+                edited_data["comment"] = comment
+                edited_text = re.sub(r'(?<=Comment: ).*$',
+                                     f"`{edited_data['comment']}`",
+                                     edited_text,
+                                     flags=re.M)
+            case _:
+                pass
+
+        return edited_data, edited_text

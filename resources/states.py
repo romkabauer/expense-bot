@@ -15,6 +15,7 @@ class States(StatesGroup):
     settings_ask_shortcut_amount = State()
     settings_parse_shortcut_amount = State()
     settings_ask_shortcut_name = State()
+    settings_delete_shortcut = State()
 
     edit_mode = State()
     edit_date = State()

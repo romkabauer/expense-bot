@@ -59,14 +59,20 @@ class SetupHandlersRouterBuilder(AbstractRouterBuilder):
         self.router.message.register(self.handler_reset_analytics,
                                      Command('reset_analytics'))
 
-        self.router.callback_query.register(self.handler_ask_shortcut_category,
+        self.router.callback_query.register(self.handler_manage_shortcuts,
                                             F.data == "shortcuts")
-        self.router.callback_query.register(self.handler_ask_shortcut_amount,
+        self.router.callback_query.register(self.handler_ask_shortcut_category,
+                                            F.data == "add_or_overwrite_shortcut")
+        self.router.callback_query.register(self.handler_parse_shortcut_category,
                                             self.state.settings_ask_shortcut_amount)
         self.router.message.register(self.handler_parse_shortcut_amount,
                                      self.state.settings_parse_shortcut_amount)
         self.router.message.register(self.handler_add_shortcut,
                                      self.state.settings_ask_shortcut_name)
+        self.router.callback_query.register(self.handler_ask_shortcut_to_delete,
+                                            F.data == "delete_shortcut")
+        self.router.callback_query.register(self.handler_delete_shortcut,
+                                            self.state.settings_delete_shortcut)
 
         return self.router
 
@@ -294,6 +300,16 @@ class SetupHandlersRouterBuilder(AbstractRouterBuilder):
                              disable_notification=True)
         await message.delete()
 
+    async def handler_manage_shortcuts(self, callback: types.CallbackQuery):
+        await callback.answer()
+        await callback.message.edit_reply_markup(
+            str(callback.message.message_id),
+            keyboards.build_listlike_keyboard(
+                ["add_or_overwrite_shortcut", "delete_shortcut"],
+                title_button_names=True
+            )
+        )
+
     async def handler_ask_shortcut_category(self, callback: types.CallbackQuery, state: FSMContext):
         await callback.answer()
         with self.db.get_session() as db:
@@ -309,7 +325,7 @@ class SetupHandlersRouterBuilder(AbstractRouterBuilder):
         await self.save_init_instruction_msg_id(msg, state)
         await state.set_state(self.state.settings_ask_shortcut_amount)
 
-    async def handler_ask_shortcut_amount(self, callback: types.CallbackQuery, state: FSMContext):
+    async def handler_parse_shortcut_category(self, callback: types.CallbackQuery, state: FSMContext):
         await callback.answer()
         await state.update_data({"shortcut_payload": {
             "category": callback.data
@@ -384,6 +400,50 @@ class SetupHandlersRouterBuilder(AbstractRouterBuilder):
         await message.delete()
         time.sleep(2)
         await msg.delete()
+
+    async def handler_ask_shortcut_to_delete(self, callback: types.CallbackQuery, state: FSMContext):
+        with self.db.get_session() as db:
+            filters = [
+                    UsersProperties.properties.has(Properties.property_name == "shortcuts"),
+                    UsersProperties.user_id == callback.message.chat.id
+                ]
+            cur_shortcuts = db.query(UsersProperties.property_value) \
+                .filter(*filters).first()
+            if not cur_shortcuts:
+                await callback.answer("⚠️No shortcuts to delete.")
+                await callback.message.delete()
+                return
+        await callback.message.reply(text="Which shortcut to delete?",
+                                     reply_markup=keyboards.build_listlike_keyboard(
+                                         entities=cur_shortcuts[0].keys(),
+                                         max_items_in_a_row=3
+                                     ))
+        await state.set_state(self.state.settings_delete_shortcut)
+        await callback.message.delete()
+
+    async def handler_delete_shortcut(self, callback: types.CallbackQuery, state: FSMContext):
+        with self.db.get_session() as db:
+            filters = [
+                    UsersProperties.properties.has(Properties.property_name == "shortcuts"),
+                    UsersProperties.user_id == callback.message.chat.id
+                ]
+            cur_shortcuts = db.query(UsersProperties.property_value) \
+                .filter(*filters).first()[0]
+            cur_shortcuts.pop(callback.data)
+
+            prop_id = db.query(Properties.property_id).filter(
+                Properties.property_name == "shortcuts"
+            ).first()[0]
+            property_payload = {
+                "user_id": callback.message.chat.id,
+                "property_id": prop_id,
+                "property_value": cur_shortcuts
+            }
+            db.bulk_update_mappings(UsersProperties, [property_payload])
+            db.commit()
+        await callback.answer(f"✅ Shortcut '{callback.data}' deleted")
+        await callback.message.delete()
+        await state.clear()
 
     async def handler_not_implemented(self, callback: types.CallbackQuery, state: FSMContext):
         msg = await callback.message.answer(interface_messages.SETTINGS_NOT_IMPLEMENTED,
