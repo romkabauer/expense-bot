@@ -1,13 +1,13 @@
-DEFAULT_SETUP_SUCCESSFUL = ("✅Default configuration is set.\n\n"
-                            "Your previous settings were NOT rewritten. "
-                            "Use /reset to wipe all settings to default.\n\n"
-                            "You can change default settings via command /settings.\n\n"
-                            "This message will be deleted in 5 seconds.")
-RESET_SUCCESSFUL = ("✅Default configuration is set.\n\n"
+DEFAULT_SETUP_SUCCESSFUL = ("✅Your profile is set.\n\n"
+                            "⚙️/settings - to change default settings\n\n"
+                            "💵/add - to add your expense\n\n"
+                            "📊/analytics - to set analytics profile")
+RESET_SUCCESSFUL = ("✅Default profile configuration is set. "
                     "Your previous settings were rewritten.\n\n"
-                    "You can change default settings via command /settings.\n\n"
-                    "This message will be deleted in 5 seconds.")
-ERROR_ADD_BEFORE_SETUP = "⚠️Please setup your bot firstly, call /setup."
+                    "⚙️/settings - to change default settings\n\n"
+                    "💵/add - to add your expense\n\n"
+                    "📊/analytics - to set analytics profile")
+ERROR_ADD_BEFORE_SETUP = "⚠️Please setup your bot firstly, call /start."
 
 SETTINGS_START = "🔤Choose setting to change:"
 SETTINGS_NOT_IMPLEMENTED = ("🙈Sorry, changes for this setting are not available yet! "
