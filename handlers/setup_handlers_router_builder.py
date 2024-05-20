@@ -32,7 +32,7 @@ class SetupHandlersRouterBuilder(AbstractRouterBuilder):
 
     def build_default_router(self):
         self.router.message.register(self.handler_setup_init,
-                                     Command(*['setup', 'reset']))
+                                     Command(*['start', 'reset']))
 
         self.router.message.register(self.handler_display_settings_menu,
                                      Command('settings'))
@@ -83,7 +83,7 @@ class SetupHandlersRouterBuilder(AbstractRouterBuilder):
         await message.delete()
         with self.db.get_session() as db:
             self.__create_user(db, user_id)
-            if command == "setup":
+            if command == "start":
                 properties_to_set = self.__get_properties_to_setup(db, user_id)
                 override = False
             else:
@@ -98,11 +98,9 @@ class SetupHandlersRouterBuilder(AbstractRouterBuilder):
 
         if inform:
             information_text = interface_messages.DEFAULT_SETUP_SUCCESSFUL \
-                if command == "setup" else interface_messages.RESET_SUCCESSFUL
+                if command == "start" else interface_messages.RESET_SUCCESSFUL
             msg = await message.answer(text=information_text,
                                        disable_notification=True)
-            time.sleep(5)
-            await msg.delete()
 
     async def handler_display_settings_menu(self, message: types.Message, state: FSMContext):
         with self.db.get_session() as db:
