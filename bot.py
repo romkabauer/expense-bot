@@ -37,9 +37,9 @@ class BotRunner:
                 BotCommand(command='shortcut', description='add via shortcuts for frequent expenses'),
                 BotCommand(command='cancel', description='terminate the flow of the current command'),
                 BotCommand(command='analytics', description='get link and credentials to analytics'),
-                BotCommand(command='reset_analytics', description='get link and credentials to analytics'),
+                BotCommand(command='reset_analytics', description='reset link and credentials to analytics'),
                 BotCommand(command='settings', description='change bot settings'),
-                BotCommand(command='setup', description='setup properties to start using bot'),
+                BotCommand(command='start', description='setup properties to start using bot'),
                 BotCommand(command='reset', description='reset properties to default'),
                 BotCommand(command='alive', description='check if bot is available'),
             ]
