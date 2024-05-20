@@ -97,19 +97,35 @@ class SuperSetInterface(GenericBIInterface):
                     "opr": "eq",
                     "value": f"user_{user_id}"
                 })
-            self.session.delete(url=f"{self.base_url}/security/users/{u_id}")
+            self.session.delete(url=f"{self.base_url}/security/users/{u_id}",
+                                headers={
+                                    "accept": "application/json",
+                                    "Content-Type": "application/json",
+                                    "Authorization": f"Bearer {self.auth_token}"
+                                })
             role_id = await self.__get_internal_entity_id_by_name("roles", {
                     "col": "name",
                     "opr": "eq",
                     "value": f"user_{user_id}"
                 })
-            self.session.delete(url=f"{self.base_url}/security/roles/{role_id}")
+            self.session.delete(url=f"{self.base_url}/security/roles/{role_id}",
+                                headers={
+                                    "accept": "application/json",
+                                    "Content-Type": "application/json",
+                                    "Authorization": f"Bearer {self.auth_token}"
+                                })
             rls_id = await self.__get_internal_entity_id_by_name("rowlevelsecurity", {
                     "col": "name",
                     "opr": "eq",
                     "value": f"user_{user_id}"
                 })
-            self.session.delete(url=f"{self.base_url}/security/rowlevelsecurity/{rls_id}")
+            self.session.delete(url=f"{self.base_url}/rowlevelsecurity/{rls_id}",
+                                headers={
+                                    "accept": "application/json",
+                                    "Content-Type": "application/json",
+                                    "Authorization": f"Bearer {self.auth_token}",
+                                    'X-CSRFToken': self.csrf_token
+                                })
 
         return await self.create_user_with_custom_role(user_id)
 
@@ -215,9 +231,13 @@ class SuperSetInterface(GenericBIInterface):
             "accept": "application/json",
             "Authorization": f"Bearer {self.auth_token}"
         }
+        if entity_type == 'rowlevelsecurity':
+            headers['X-CSRFToken'] = self.csrf_token
 
         response = self.session.get(
-            url=f"{self.base_url}/security/{entity_type}/",
+            url=(f"{self.base_url}/"
+                 f"{'security/' if not entity_type == 'rowlevelsecurity' else ''}"
+                 f"{entity_type}/"),
             headers=headers,
             params=params
         )
