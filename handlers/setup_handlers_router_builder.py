@@ -195,8 +195,11 @@ class SetupHandlersRouterBuilder(AbstractRouterBuilder):
         await state.update_data({"setting_property": callback.data})
         with self.db.get_session() as db:
             categories = db.query(UsersProperties.property_value) \
-                .filter(UsersProperties.properties.has(
-                    Properties.property_name == "categories")
+                .filter(
+                    UsersProperties.properties.has(
+                        Properties.property_name == "categories"
+                    ),
+                    UsersProperties.user_id == callback.from_user.id
                 ) \
                 .first()
         msg = await callback.message.reply(interface_messages.SETTINGS_CATEGORIES_CHOICE,
