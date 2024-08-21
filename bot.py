@@ -6,6 +6,7 @@ from handlers import (
     BasicHandlersRouterBuilder,
     SetupHandlersRouterBuilder,
     ExpenseHandlersRouterBuilder,
+    ScheduleHandlersRouterBuilder
 )
 from resources.states import States
 from logger import Logger
@@ -28,7 +29,10 @@ class BotRunner:
         expense_router = ExpenseHandlersRouterBuilder()
         expense_router = expense_router.build_default_router()
 
-        self.dispatcher.include_routers(*[basic_router, expense_router, setup_router])
+        schedule_router = ScheduleHandlersRouterBuilder()
+        schedule_router = schedule_router.build_default_router()
+
+        self.dispatcher.include_routers(*[basic_router, expense_router, setup_router, schedule_router])
 
     async def on_startup(self, *args):
         await self.bot.set_my_commands(

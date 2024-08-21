@@ -29,6 +29,11 @@ SETTINGS_REQUEST_VALUES_FOR_CATEGORY = ("Please, specify default values for this
                                         "_Cat1, Cat2, Cat 3, Cat\_4_ \- values for comments "
                                         "within categories should be divided by comma")
 
+SETTINGS_SCHEDULED_JOBS_TASKS_TO_ADD = ("Choose job to schedule.\n"
+                                        "*Weekly Report* - "
+                                        "bot will send summary of expenses for last week every Sunday, "
+                                        "at 20:30 UTC+3 by default")
+
 ASK_EXPENSE_DATE = "📅When did you spend?"
 ASK_EXPENSE_CATEGORY = "🛍️What is the expense category?"
 ASK_SHORTCUT = "💵Choose frequent payment shortcut:"
