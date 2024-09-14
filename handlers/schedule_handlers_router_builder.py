@@ -1,43 +1,33 @@
-import time
-import re
-from datetime import datetime as dt, timedelta as td
-from datetime import timezone
-
 from aiogram import (
     types,
     Router,
     Bot,
     F
 )
-from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
-from sqlalchemy.orm import Session
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler_di import ContextSchedulerDecorator
 
 from handlers.abstract_router_builder import AbstractRouterBuilder
+from database.database import DatabaseFacade
+from logger import Logger
 from resources import (
     interface_messages,
     keyboards,
-    bi_interface,
-    analytics_sql_templates
-)
-from database.models import (
-    UsersProperties,
-    Properties
+    analytics_sql_templates,
+    scheduler_job_templates
 )
 
 
 class ScheduleHandlersRouterBuilder(AbstractRouterBuilder):
-    def __init__(self):
+    def __init__(self, scheduler: ContextSchedulerDecorator):
         super().__init__()
         self.router = Router(name=self.__class__.__name__)
-        self.scheduler = AsyncIOScheduler()
-        self.scheduler.start()
+        self.scheduler = scheduler
         self.scheduled_jobs_map = {
             "weekly_report": {
                 "scheduled_query": analytics_sql_templates.DEFAULT_WEEKLY_REPORT,
-                "default_cron_schedule": CronTrigger.from_crontab('*/5 * * * *', 'Etc/GMT-3')
+                "default_cron_schedule": CronTrigger.from_crontab('*/1 * * * *', 'Etc/GMT-3')
                 # "default_cron_schedule": CronTrigger.from_crontab('30 20 * * sun', 'Etc/GMT-3')
             }
         }
@@ -72,16 +62,22 @@ class ScheduleHandlersRouterBuilder(AbstractRouterBuilder):
                                                entities=list(self.scheduled_jobs_map.keys()),
                                                max_items_in_a_row=3
                                            ),
+                                           parse_mode="MarkdownV2",
                                            disable_notification=True)
         await callback.message.delete()
         await self.save_init_instruction_msg_id(msg, state)
         await state.set_state(self.state.settings_sch_jobs_choose_job_to_add)
 
-    async def handler_add_job(self, callback: types.CallbackQuery, state: FSMContext):
-        self.scheduler.add_job(self.job_send_hello,
+    async def handler_add_job(self, callback: types.CallbackQuery, state: FSMContext, bot: Bot):
+        self.scheduler.ctx.add_instance(self.logger, Logger)
+        self.scheduler.ctx.add_instance(self.db, DatabaseFacade)
+        self.scheduler.add_job(scheduler_job_templates.job_send_message,
                                self.scheduled_jobs_map[callback.data].get("default_cron_schedule"),
                                kwargs={
-                                   "message": callback.message
+                                   "user_id": callback.from_user.id,
+                                   "logger": self.logger,
+                                   "db": self.db,
+                                   "bot": bot
                                })
         await callback.message.delete()
         await callback.answer(interface_messages.SETTINGS_SET_SUCCESS)
@@ -108,7 +104,3 @@ class ScheduleHandlersRouterBuilder(AbstractRouterBuilder):
             # add property to db and say no jobs to edit
             # return
         pass
-
-    @staticmethod
-    async def job_send_hello(message: types.Message):
-        await message.answer("Hello!")

@@ -5,3 +5,4 @@ SQLAlchemy==2.0.28
 psycopg2==2.9.9
 freecurrencyapi==0.1.0
 APScheduler==3.10.4
+apscheduler-di==0.1.0

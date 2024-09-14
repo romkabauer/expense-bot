@@ -1,6 +1,14 @@
-from aiogram import Bot, Dispatcher
+import os
+from aiogram import (
+    Bot,
+    Dispatcher
+)
 from aiogram.types.bot_command import BotCommand
 from aiogram.fsm.storage.memory import MemoryStorage
+
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
+from apscheduler_di import ContextSchedulerDecorator
 
 from handlers import (
     BasicHandlersRouterBuilder,
@@ -18,6 +26,15 @@ class BotRunner:
         self.dispatcher = Dispatcher(storage=MemoryStorage())
         self.logger = Logger()
         self.states = States
+        self.scheduler = ContextSchedulerDecorator(
+            AsyncIOScheduler(jobstores={
+                "default": SQLAlchemyJobStore(
+                    url=os.environ["JOB_STORE_DB_CONNECTION_STRING"]
+                )
+            })
+        )
+        self.scheduler.ctx.add_instance(self.bot, Bot)
+        self.scheduler.start()
 
     def register_handlers(self):
         basic_router = BasicHandlersRouterBuilder()
@@ -29,7 +46,7 @@ class BotRunner:
         expense_router = ExpenseHandlersRouterBuilder()
         expense_router = expense_router.build_default_router()
 
-        schedule_router = ScheduleHandlersRouterBuilder()
+        schedule_router = ScheduleHandlersRouterBuilder(self.scheduler)
         schedule_router = schedule_router.build_default_router()
 
         self.dispatcher.include_routers(*[basic_router, expense_router, setup_router, schedule_router])

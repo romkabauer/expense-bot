@@ -55,6 +55,7 @@ services:
       - SUPERSET_ADMIN_PASSWORD
       - SUPERSET_UI_URL
       - FREECURRENCYAPI_API_KEY
+      - JOB_STORE_DB_CONNECTION_STRING
 
 volumes:
   local_pgdata:
