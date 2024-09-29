@@ -18,6 +18,7 @@ class States(StatesGroup):
     settings_delete_shortcut = State()
 
     settings_sch_jobs_choose_job_to_add = State()
+    settings_sch_jobs_confirm_deletion = State()
     # settings_sch_jobs_adding_job = State()
     # settings_sch_jobs_choose_job_to_edit = State()
     # settings_sch_jobs_choose_job_prop_to_edit = State()

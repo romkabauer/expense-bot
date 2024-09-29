@@ -8,7 +8,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
-from apscheduler_di import ContextSchedulerDecorator
+from apscheduler_di.decorator import ContextSchedulerDecorator
 
 from handlers import (
     BasicHandlersRouterBuilder,

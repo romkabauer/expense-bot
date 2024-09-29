@@ -33,6 +33,7 @@ SETTINGS_SCHEDULED_JOBS_TASKS_TO_ADD = ("Choose job to schedule\.\n\n"
                                         "*Weekly Report* \- "
                                         "bot will send summary of expenses for last week every Sunday, "
                                         "at 20:30 UTC\+3 by default")
+SETTINGS_SCHEDULED_JOBS_TASKS_TO_DELETE = ("Choose job to delete\.\n\n")
 
 ASK_EXPENSE_DATE = "📅When did you spend?"
 ASK_EXPENSE_CATEGORY = "🛍️What is the expense category?"
