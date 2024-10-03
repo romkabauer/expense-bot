@@ -11,27 +11,27 @@ WITH base_currency AS (
 )
 
 , base_expenses AS (
-SELECT
-    e.id AS expense_id,
-    c.name AS category_name,
-    e.spent_on,
-    COALESCE(
-        CASE
-            WHEN e.currency = bc.base_currency THEN e.amount
-            ELSE e.amount /
-                nullif(((e.rates->>'rates')::json->>e.currency)::float, 0) * -- convert to base_currency (BC) from column rates
-                nullif(((e.rates->>'rates')::json->>bc.base_currency)::float, 0) -- convert to latest BC (mostly multiplies on 1, but crucial if BC on expense date differs from latest)
-        END,
-        e.amount)::decimal(15,2) AS amount_in_base_currency,
-    bc.base_currency AS base_currency
-FROM expense_bot.expenses e
-LEFT JOIN expense_bot.categories c ON e.category_id = c.id
-LEFT JOIN base_currency bc ON e.user_id = bc.user_id
-WHERE
-    e.user_id = {{user_id}}
-    AND e.spent_on BETWEEN DATE_TRUNC('week', CURRENT_DATE) - INTERVAL '28 days' AND CURRENT_DATE
-    AND c.name NOT IN ('Rent')
-ORDER BY e.spent_on DESC, e.created_at DESC
+    SELECT
+        e.id AS expense_id,
+        c.name AS category_name,
+        e.spent_on,
+        COALESCE(
+            CASE
+                WHEN e.currency = bc.base_currency THEN e.amount
+                ELSE e.amount /
+                    nullif(((e.rates->>'rates')::json->>e.currency)::float, 0) * -- convert to base_currency (BC) from column rates
+                    nullif(((e.rates->>'rates')::json->>bc.base_currency)::float, 0) -- convert to latest BC (mostly multiplies on 1, but crucial if BC on expense date differs from latest)
+            END,
+            e.amount)::decimal(15,2) AS amount_in_base_currency,
+        bc.base_currency AS base_currency
+    FROM expense_bot.expenses e
+    LEFT JOIN expense_bot.categories c ON e.category_id = c.id
+    LEFT JOIN base_currency bc ON e.user_id = bc.user_id
+    WHERE
+        e.user_id = {{user_id}}
+        AND e.spent_on BETWEEN DATE_TRUNC('week', CURRENT_DATE) - INTERVAL '28 days' AND CURRENT_DATE
+        AND c.name NOT IN ('Rent')
+    ORDER BY e.spent_on DESC, e.created_at DESC
 )
 
 , expenses_by_week AS (
@@ -69,7 +69,7 @@ ORDER BY e.spent_on DESC, e.created_at DESC
         COALESCE(LAG(e.sum_amount, 4) OVER(PARTITION BY wc.name ORDER BY wc.week), 0) AS prev_month_week_sum_amount
     FROM weeks_and_categories wc
     LEFT JOIN expenses_by_week e ON wc.week = e.week AND wc.name = e.category_name
-    CROSS JOIN (SELECT MAX(base_currency) AS base_currency FROM expenses_by_week) bc
+    CROSS JOIN base_currency bc
     ORDER BY 2, 1
 )
 
@@ -93,7 +93,7 @@ SELECT
     END AS diff_prev_month_week_pct
 FROM prev_amounts pa
 WHERE
-    week = (SELECT MAX(week) FROM prev_amounts)
+    week = TO_CHAR(CURRENT_DATE, 'YYYYWW')
     AND NOT (prev_week_sum_amount = 0 AND sum_amount = 0)
 ORDER BY pa.sum_amount DESC
 """
