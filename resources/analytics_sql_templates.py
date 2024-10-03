@@ -91,9 +91,9 @@ SELECT
         WHEN prev_month_week_sum_amount = 0 THEN '+100.00%'
         ELSE CASE WHEN sum_amount - prev_month_week_sum_amount > 0 THEN '+' ELSE '' END || ROUND((sum_amount - prev_month_week_sum_amount) / prev_month_week_sum_amount * 100, 2) || '%'
     END AS diff_prev_month_week_pct
-FROM prev_amounts
+FROM prev_amounts pa
 WHERE
     week = (SELECT MAX(week) FROM prev_amounts)
     AND NOT (prev_week_sum_amount = 0 AND sum_amount = 0)
-ORDER BY sum_amount DESC
+ORDER BY pa.sum_amount DESC
 """

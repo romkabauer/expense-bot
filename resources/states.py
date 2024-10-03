@@ -19,9 +19,10 @@ class States(StatesGroup):
 
     settings_sch_jobs_choose_job_to_add = State()
     settings_sch_jobs_confirm_deletion = State()
-    # settings_sch_jobs_adding_job = State()
-    # settings_sch_jobs_choose_job_to_edit = State()
-    # settings_sch_jobs_choose_job_prop_to_edit = State()
+    settings_sch_jobs_choose_attribute_to_edit = State()
+    settings_sch_jobs_request_new_attribute_value = State()
+    settings_sch_jobs_parse_new_time = State()
+    settings_sch_jobs_parse_new_weekday = State()
 
     edit_mode = State()
     edit_date = State()

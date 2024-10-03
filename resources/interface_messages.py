@@ -33,7 +33,10 @@ SETTINGS_SCHEDULED_JOBS_TASKS_TO_ADD = ("Choose job to schedule\.\n\n"
                                         "*Weekly Report* \- "
                                         "bot will send summary of expenses for last week every Sunday, "
                                         "at 20:30 UTC\+3 by default")
-SETTINGS_SCHEDULED_JOBS_TASKS_TO_DELETE = ("Choose job to delete\.\n\n")
+SETTINGS_SCHEDULED_JOBS_TASKS_TO_EDIT = ("Choose job to edit/delete\.\n\n")
+SETTINGS_SCHEDULED_JOBS_ATTRIBUTES_TO_EDIT = ("Choose job attribute to edit\.\n\n")
+SETTINGS_SCHEDULED_JOBS_EDIT_TIME = ("Enter new job time in UTC\+0 timezone in format *HH:MM*\. For example, 23:15\.")
+SETTINGS_SCHEDULED_JOBS_EDIT_WEEKDAY = ("Choose weekday to send job on\.")
 
 ASK_EXPENSE_DATE = "📅When did you spend?"
 ASK_EXPENSE_CATEGORY = "🛍️What is the expense category?"
@@ -54,6 +57,7 @@ WRONG_EXPENSE_AMOUNT_FORMAT = ("⛔️Wrong format for spending amount(s).\n"
                                "🔤Should contain only positive numbers "
                                "with . decimal separator and currency label:")
 WRONG_DATE_FORMAT = "⛔️Wrong date format.\n"
+WRONG_TIME_FORMAT = "⛔️Wrong time format.\n"
 WRONG_DATE_TIMELINESS = "⛔️Input cannot contain future dates.\n"
 WRONG_NO_SHORTCUTS = "⛔No shortcuts registered. Please use /settings command to set one up."
 

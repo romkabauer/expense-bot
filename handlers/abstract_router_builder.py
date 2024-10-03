@@ -79,6 +79,14 @@ class AbstractRouterBuilder:
         await state.set_data(data)
         return is_valid
 
+    async def is_valid_time_format(self, message: types.Message, state: FSMContext, bot: Bot):
+        is_valid = True
+        if not re.match(r"([0-1][0-9]|2[0-3]):[0-5][0-9]", message.text.strip()):
+            await self.delete_init_instruction(message.chat.id, state, bot)
+            await state.update_data(invalid_time_format_msg=interface_messages.WRONG_TIME_FORMAT)
+            is_valid = False
+        return is_valid
+
     async def is_valid_expense_amount(self, message: str):
         pattern = (r"^\d+([.]\d+)?(.("
                    f"{'|'.join([f'{x}|{x.lower()}' for x in self.supported_base_currencies])}"
