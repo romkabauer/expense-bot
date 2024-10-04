@@ -1,3 +1,4 @@
 from handlers.expense_handlers_router_builder import ExpenseHandlersRouterBuilder
 from handlers.setup_handlers_router_builder import SetupHandlersRouterBuilder
 from handlers.basic_handlers_router_builder import BasicHandlersRouterBuilder
+from handlers.schedule_handlers_router_builder import ScheduleHandlersRouterBuilder

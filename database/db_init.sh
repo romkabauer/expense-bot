@@ -4,6 +4,7 @@ set -e
 psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" <<-EOSQL
 	CREATE DATABASE expense_bot;
 	CREATE DATABASE superset_metadata;
+	CREATE DATABASE scheduler_jobstore;
 EOSQL
 
 psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" expense_bot <<-EOSQL
