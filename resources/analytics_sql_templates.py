@@ -36,14 +36,14 @@ WITH base_currency AS (
 
 , expenses_by_week AS (
     SELECT
-        TO_CHAR(spent_on, 'YYYYWW') AS week,
+        TO_CHAR(spent_on, 'YYYYIW') AS week,
         COALESCE(category_name, 'TOTAL') AS category_name,
         SUM(amount_in_base_currency) AS sum_amount,
         MAX(base_currency) AS base_currency
     FROM base_expenses e
     GROUP BY GROUPING SETS
-        (TO_CHAR(spent_on, 'YYYYWW'), category_name),
-        (TO_CHAR(spent_on, 'YYYYWW'))
+        (TO_CHAR(spent_on, 'YYYYIW'), category_name),
+        (TO_CHAR(spent_on, 'YYYYIW'))
 )
 
 , weeks_and_categories AS (
@@ -93,7 +93,7 @@ SELECT
     END AS diff_prev_month_week_pct
 FROM prev_amounts pa
 WHERE
-    week = TO_CHAR(CURRENT_DATE, 'YYYYWW')
+    week = TO_CHAR(CURRENT_DATE, 'YYYYIW')
     AND NOT (prev_week_sum_amount = 0 AND sum_amount = 0)
 ORDER BY pa.sum_amount DESC
 """
