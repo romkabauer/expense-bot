@@ -1,4 +1,4 @@
-import time
+import asyncio
 
 from aiogram import (
     types,
@@ -9,11 +9,12 @@ from aiogram.fsm.context import FSMContext
 
 from handlers.abstract_router_builder import AbstractRouterBuilder
 from resources import interface_messages
+from logger import Logger
 
 
 class BasicHandlersRouterBuilder(AbstractRouterBuilder):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, logger: Logger):
+        super().__init__(logger)
         self.router = Router(name=self.__class__.__name__)
 
     def build_default_router(self):
@@ -28,7 +29,7 @@ class BasicHandlersRouterBuilder(AbstractRouterBuilder):
         await state.set_state(self.state.shortcut)
         msg = await message.answer(text=interface_messages.HEALTH_CHECK,
                                    disable_notification=True)
-        time.sleep(2)
+        await asyncio.sleep(2)
         await msg.delete()
 
     async def handler_cancel(self, message: types.Message, state: FSMContext, bot):

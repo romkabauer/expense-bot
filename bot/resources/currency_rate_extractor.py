@@ -14,9 +14,9 @@ class CurrencyRateExtractor:
             base_currency: str = "USD",
             on_date: str = dt.date(dt.now()).isoformat()) -> dict[str, str | dict[str, float]]:
         cdn_jsdelivr_rates = self.__extract_from_cdn_jsdelivr_api(base_currency, on_date)
-        if cdn_jsdelivr_rates.get("error_details"):
+        if "error_details" in cdn_jsdelivr_rates:
             freecurrencyapi_rates = self.__extract_from_freecurrency_api(base_currency, on_date)
-            if freecurrencyapi_rates.get("error_details"):
+            if "error_details" in freecurrencyapi_rates:
                 return {
                     "base": base_currency,
                     "rates": {c: 0 for c in self.supported_currencies}

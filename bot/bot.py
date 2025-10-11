@@ -10,13 +10,14 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from apscheduler_di.decorator import ContextSchedulerDecorator
 
+from resources.states import States
 from handlers import (
     BasicHandlersRouterBuilder,
     SetupHandlersRouterBuilder,
     ExpenseHandlersRouterBuilder,
-    ScheduleHandlersRouterBuilder
+    ScheduleHandlersRouterBuilder,
+    AIHandlersRouterBuilder
 )
-from resources.states import States
 from logger import Logger
 
 
@@ -37,19 +38,22 @@ class BotRunner:
         self.scheduler.start()
 
     def register_handlers(self):
-        basic_router = BasicHandlersRouterBuilder()
+        basic_router = BasicHandlersRouterBuilder(self.logger)
         basic_router = basic_router.build_default_router()
 
-        setup_router = SetupHandlersRouterBuilder()
+        setup_router = SetupHandlersRouterBuilder(self.logger)
         setup_router = setup_router.build_default_router()
 
-        expense_router = ExpenseHandlersRouterBuilder()
+        expense_router = ExpenseHandlersRouterBuilder(self.logger)
         expense_router = expense_router.build_default_router()
 
-        schedule_router = ScheduleHandlersRouterBuilder(self.scheduler)
+        schedule_router = ScheduleHandlersRouterBuilder(self.logger, self.scheduler)
         schedule_router = schedule_router.build_default_router()
 
-        self.dispatcher.include_routers(*[basic_router, expense_router, setup_router, schedule_router])
+        ai_router = AIHandlersRouterBuilder(self.logger)
+        ai_router = ai_router.build_default_router()
+
+        self.dispatcher.include_routers(*[basic_router, expense_router, setup_router, schedule_router, ai_router])
 
     async def on_startup(self, *args):
         await self.bot.set_my_commands(

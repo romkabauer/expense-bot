@@ -22,8 +22,8 @@ from resources import (
 
 
 class ScheduleHandlersRouterBuilder(AbstractRouterBuilder):
-    def __init__(self, scheduler: ContextSchedulerDecorator):
-        super().__init__()
+    def __init__(self, logger: Logger, scheduler: ContextSchedulerDecorator):
+        super().__init__(logger)
         self.router = Router(name=self.__class__.__name__)
         self.scheduler = scheduler
         self.scheduled_jobs_map = {

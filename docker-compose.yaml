@@ -3,8 +3,8 @@ services:
   db:
     image: expense-bot-db:0.1.0
     build:
-      context: .
-      dockerfile: database/Dockerfile
+      context: db
+      dockerfile: db/Dockerfile
       cache_from:
         - expense-bot-db:0.1.0
     container_name: expense-bot-db
@@ -19,7 +19,7 @@ services:
   bi:
     image: expense-bot-bi:0.1.0
     build:
-      context: .
+      context: superset
       dockerfile: superset/Dockerfile
       cache_from:
         - expense-bot-bi:0.1.0
@@ -40,8 +40,8 @@ services:
   bot:
     image: expense-bot:0.3.0
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: bot
+      dockerfile: bot/Dockerfile
       cache_from:
         - expense-bot:0.3.0
     container_name: expense-bot-bot

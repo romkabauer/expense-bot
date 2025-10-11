@@ -1,4 +1,4 @@
-import time
+import asyncio
 import re
 
 from aiogram import (
@@ -23,11 +23,12 @@ from database.models import (
     Properties,
     Categories,
 )
+from logger import Logger
 
 
 class SetupHandlersRouterBuilder(AbstractRouterBuilder):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, logger: Logger):
+        super().__init__(logger)
         self.router = Router(name=self.__class__.__name__)
 
     def build_default_router(self):
@@ -260,7 +261,7 @@ class SetupHandlersRouterBuilder(AbstractRouterBuilder):
         msg = await message.answer(interface_messages.SETTINGS_SET_SUCCESS,
                                    disable_notification=True)
         await message.delete()
-        time.sleep(2)
+        await asyncio.sleep(2)
         await msg.delete()
         await state.clear()
 
@@ -399,7 +400,7 @@ class SetupHandlersRouterBuilder(AbstractRouterBuilder):
         msg = await message.answer(interface_messages.SETTINGS_SET_SUCCESS,
                                    disable_notification=True)
         await message.delete()
-        time.sleep(2)
+        await asyncio.sleep(2)
         await msg.delete()
 
     async def handler_ask_shortcut_to_delete(self, callback: types.CallbackQuery, state: FSMContext):
@@ -450,7 +451,7 @@ class SetupHandlersRouterBuilder(AbstractRouterBuilder):
         msg = await callback.message.answer(interface_messages.SETTINGS_NOT_IMPLEMENTED,
                                             disable_notification=True)
         await callback.message.delete()
-        time.sleep(2)
+        await asyncio.sleep(2)
         await msg.delete()
 
     @staticmethod

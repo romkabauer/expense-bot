@@ -1,4 +1,4 @@
-import time
+import asyncio
 import re
 
 from aiogram import types, Router, F, Bot
@@ -24,11 +24,12 @@ from resources.keyboards import (
 from resources import interface_messages
 from resources.expense_attributes import ExpenseAttribute
 from resources.editing_labels import EditingLabels
+from logger import Logger
 
 
 class ExpenseHandlersRouterBuilder(AbstractRouterBuilder):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, logger: Logger):
+        super().__init__(logger)
         self.router = Router(name=self.__class__.__name__)
 
     def build_default_router(self):
@@ -107,15 +108,17 @@ class ExpenseHandlersRouterBuilder(AbstractRouterBuilder):
                         Properties.property_name == "shortcuts"),
                         UsersProperties.user_id == message.from_user.id
                     ).all()
-                if shortcuts:
-                    await state.set_state(self.state.shortcut)
-                else:
+                if not shortcuts:
                     msg = await message.answer(interface_messages.WRONG_NO_SHORTCUTS,
-                                               disable_notification=True)
-                    time.sleep(2)
-                    await msg.delete()
+                                            disable_notification=True)
                     await message.delete()
+                    await asyncio.sleep(2)
+                    await msg.delete()
                     return
+                await state.set_state(self.state.shortcut)
+                await self.__route_user_by_state(message, state)
+                await message.delete()
+                return
 
         msg = await message.answer(interface_messages.ASK_EXPENSE_DATE,
                                    reply_markup=build_date_keyboard(),
@@ -136,10 +139,10 @@ class ExpenseHandlersRouterBuilder(AbstractRouterBuilder):
                 else (dt.now() - td(1)).strftime('%Y-%m-%d')
             await state.update_data({
                 "db_payload": {
-                    "when": when_value
+                    "spent_on": when_value
                 }
             })
-            await self.__route_user_by_state(callback, state)  # goes to the next step
+            await self.__route_user_by_state(callback, state)
 
             if await state.get_state() == self.state.edit_date:
                 await state.clear()
@@ -151,7 +154,6 @@ class ExpenseHandlersRouterBuilder(AbstractRouterBuilder):
             await self.save_init_instruction_msg_id(msg, state)
 
             if not await state.get_state():
-                # start date parsing workflow
                 await state.set_state(self.state.other_date_input)
 
             if await state.get_state() == self.state.edit_date:
@@ -165,7 +167,6 @@ class ExpenseHandlersRouterBuilder(AbstractRouterBuilder):
         Checks input message for format validity and that it is not in the future,
         then goes to next step.
         """
-        # keeping re-ask for date input if quality rules are not meet
         if not await self.is_valid_date_format(message, state, bot) or \
            not await self.is_valid_date_timeliness(message, state, bot):
             data = await state.get_data()
@@ -182,10 +183,10 @@ class ExpenseHandlersRouterBuilder(AbstractRouterBuilder):
         await self.delete_init_instruction(message.chat.id, state, bot)
         await state.update_data({
             "db_payload": {
-                "when": message.text
+                "spent_on": message.text
             }
         })
-        await self.__route_user_by_state(message, state)  # goes to the next step
+        await self.__route_user_by_state(message, state)
 
         if await state.get_state() == self.state.edit_date:
             await state.clear()
@@ -248,7 +249,6 @@ class ExpenseHandlersRouterBuilder(AbstractRouterBuilder):
             return
 
         await state.set_state(self.state.commenting)
-        # go to the next step
         msg = await self.__ask_for_expense_comment(message, state, message.from_user.id, cur_state_data["db_payload"]["category"])
         await self.save_init_instruction_msg_id(msg, state)
         await message.delete()
@@ -272,7 +272,7 @@ class ExpenseHandlersRouterBuilder(AbstractRouterBuilder):
         if await state.get_state() == self.state.edit_comment:
             await self.__route_user_by_state(message, state)
         else:
-            await self.report_expense_details(expense_data)
+            await self.report_expense_details(expense_data["db_payload"])
 
         await message.delete()
         await state.clear()
@@ -286,17 +286,14 @@ class ExpenseHandlersRouterBuilder(AbstractRouterBuilder):
         self.logger.log(self, callback.from_user.id, str(cur_state_data))
 
         shortcut_payload = cur_state_data["shortcuts_payloads"][callback.data]
-        expense_data = {
-                "db_payload": {
-                    "when": cur_state_data["db_payload"]["when"],
-                    "category": shortcut_payload["category"],
-                    "amount": shortcut_payload["amount"],
-                    "user_id": callback.from_user.id,
-                    "message": callback.message,
-                    "comment": callback.data
-                }
-            }
-        await self.report_expense_details(expense_data)
+        await self.report_expense_details({
+            "spent_on": dt.now().strftime('%Y-%m-%d'),
+            "category": shortcut_payload["category"],
+            "amount": shortcut_payload["amount"],
+            "user_id": callback.from_user.id,
+            "message": callback.message,
+            "comment": callback.data
+        })
         await self.delete_init_instruction(callback.message.chat.id, state, bot)
         await state.clear()
 
