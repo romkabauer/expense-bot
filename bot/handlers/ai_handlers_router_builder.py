@@ -40,6 +40,10 @@ class AIHandlersRouterBuilder(AbstractRouterBuilder):
 
     async def handler_voice_expense_with_ai(self, message: types.Message, bot: Bot):
         user_id = message.from_user.id
+        progress_msg = await message.reply(
+            "🤖 Your voice message is being handeled by AI, it may take 5-10 seconds...",
+            disable_notification=True
+        )
 
         voice = message.voice
         file_info = await bot.get_file(voice.file_id)
@@ -69,10 +73,15 @@ class AIHandlersRouterBuilder(AbstractRouterBuilder):
         finally:
             if destination.exists():
                 os.remove(destination)
+            await progress_msg.delete()
             await message.delete()
 
     async def handler_text_expense_with_ai(self, message: types.Message):
         user_id = message.from_user.id
+        progress_msg = await message.reply(
+            "🤖 Your message is being handeled by AI, it may take 5-10 seconds...",
+            disable_notification=True
+        )
 
         with self.db.get_session() as db:
             users_comments = db.query(UsersProperties.property_value).filter(
@@ -90,6 +99,7 @@ class AIHandlersRouterBuilder(AbstractRouterBuilder):
         expense_payload = json.loads(ai_response)
         expense_payload = await self.__refine_ai_response(expense_payload, message)
         await self.report_expense_details(expense_payload)
+        await progress_msg.delete()
         await message.delete()
 
     async def __refine_ai_response(self, expense_payload: dict, message: types.Message) -> dict:
