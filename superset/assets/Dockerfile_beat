@@ -1,0 +1,30 @@
+# Base
+ARG SUPERSET_VERSION=5.0.0-py311
+FROM apache/superset:${SUPERSET_VERSION} as base
+
+USER root
+RUN uv pip install --no-cache psycopg2-binary \
+    && rm -rf /app/.playwright-browsers \
+    && rm -rf /app/tests /app/docs \
+    && rm -rf /app/superset_home \
+    && apt-get update && apt-get install -y  \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+USER superset
+
+# Beat
+FROM python:3.11-slim
+
+RUN useradd -ms /bin/bash -u 1000 superset
+
+WORKDIR /app
+COPY --from=base /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=base /app /app
+
+COPY --chown=superset superset_config.py /app/
+ENV SUPERSET_CONFIG_PATH /app/superset_config.py
+
+USER superset
+
+CMD ["/app/.venv/bin/celery", "--app=superset.tasks.celery_app:app", "beat"]

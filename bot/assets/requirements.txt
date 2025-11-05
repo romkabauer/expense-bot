@@ -1,0 +1,10 @@
+aiogram==3.22.0
+requests==2.32.3
+alembic==1.13.1
+SQLAlchemy==2.0.28
+psycopg2-binary==2.9.9
+freecurrencyapi==0.1.0
+APScheduler==3.10.4
+apscheduler-di==0.1.0
+google-genai==1.41.0
+pydantic==2.11.1
