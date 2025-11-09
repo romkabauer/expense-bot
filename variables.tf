@@ -119,6 +119,12 @@ variable "superset_external_port" {
   default     = 3000
 }
 
+variable "superset_ui_url" {
+  description = "Superset UI URL"
+  type        = string
+  default     = "http://localhost:${var.superset_external_port}"
+}
+
 # BOT
 variable "bot_version" {
     type = string

@@ -105,7 +105,7 @@ module "bot" {
   superset_admin_username = var.superset_admin_username
   superset_admin_password = var.superset_admin_password
   superset_base_url = "http://${var.superset_container_name}:${var.superset_internal_port}/api/v1"
-  superset_ui_url = "http://localhost:${var.superset_external_port}"
+  superset_ui_url = var.superset_ui_url
 
   depends_on = [ module.bi ]
 }
