@@ -15,7 +15,8 @@ module "postgres_db" {
   }
 
   docker_network_name = var.docker_network_name
-  
+  docker_image_id = docker_image.postgres_custom.image_id
+
   db_host_name = var.db_host_name
   postgres_version = var.postgres_version
 
@@ -38,6 +39,7 @@ module "redis" {
   }
 
   docker_network_name = var.docker_network_name
+  docker_image_id = docker_image.redis.image_id
 
   redis_host_name = var.redis_host_name
   redis_version = var.redis_version
@@ -54,6 +56,9 @@ module "bi" {
   }
 
   docker_network_name = var.docker_network_name
+  docker_image_id = docker_image.superset.image_id
+  docker_image_worker_id = docker_image.superset_celery_worker.image_id
+  docker_image_beat_id = docker_image.superset_celery_beat.image_id
 
   db_host_name = var.db_host_name
   postgres_user = var.postgres_user
@@ -69,7 +74,6 @@ module "bi" {
   superset_admin_username = var.superset_admin_username
   superset_admin_password = var.superset_admin_password
   superset_secret_key = var.superset_secret_key
-  superset_ui_url = var.superset_ui_url
 
   depends_on = [ module.postgres_db, module.redis ]
 }
@@ -89,6 +93,7 @@ module "bot" {
   gemini_api_key = var.gemini_api_key
 
   docker_network_name = var.docker_network_name
+  docker_image_id = docker_image.expense_bot.image_id
 
   db_host_name = var.db_host_name
   postgres_user = var.postgres_user
@@ -99,7 +104,8 @@ module "bot" {
 
   superset_admin_username = var.superset_admin_username
   superset_admin_password = var.superset_admin_password
-  superset_ui_url = var.superset_ui_url
+  superset_base_url = "http://${var.superset_container_name}:${var.superset_internal_port}/api/v1"
+  superset_ui_url = "http://localhost:${var.superset_external_port}"
 
   depends_on = [ module.bi ]
 }

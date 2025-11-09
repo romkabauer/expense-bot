@@ -2,6 +2,18 @@ variable "docker_network_name" {
   type = string
 }
 
+variable "docker_image_id" {
+  type = string
+}
+
+variable "docker_image_worker_id" {
+  type = string
+}
+
+variable "docker_image_beat_id" {
+  type = string
+}
+
 variable "db_host_name" {
   type = string
 }
@@ -57,7 +69,14 @@ variable "superset_secret_key" {
   sensitive   = true
 }
 
-variable "superset_ui_url" {
-  description = "Superset UI URL"
-  type        = string
+variable "superset_internal_port" {
+  description = "Superset internal port"
+  type        = number
+  default     = 8088
+}
+
+variable "superset_external_port" {
+  description = "Superset external port"
+  type        = number
+  default     = 3000
 }

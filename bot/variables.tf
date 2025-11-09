@@ -2,6 +2,10 @@ variable "docker_network_name" {
   type = string
 }
 
+variable "docker_image_id" {
+  type = string
+}
+
 variable "db_host_name" {
   type = string
 }
@@ -48,6 +52,11 @@ variable "superset_ui_url" {
   type        = string
 }
 
+variable "superset_base_url" {
+  description = "Superset base URL for API calls"
+  type        = string
+}
+
 variable "bot_version" {
   type = string
   sensitive = false
@@ -57,7 +66,7 @@ variable "telegram_bot_token" {
   description = "Telegram Bot Token from @BotFather"
   type        = string
   sensitive   = true
-  
+
   validation {
     condition     = length(var.telegram_bot_token) > 0
     error_message = "Telegram bot token is required."

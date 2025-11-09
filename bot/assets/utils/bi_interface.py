@@ -4,7 +4,6 @@ import os
 import json
 import secrets
 import requests as r
-from datetime import datetime as dt
 
 
 class GenericBIInterface:
@@ -18,9 +17,9 @@ class GenericBIInterface:
 
 
 class SupersetInterface(GenericBIInterface):
-    def __init__(self, base_url: str = "http://bi:8088/api/v1"):
+    def __init__(self) -> None:
         super().__init__()
-        self.base_url = base_url
+        self.base_url = os.getenv("SUPERSET_BASE_URL")
         self.service_user_name = os.getenv("SUPERSET_ADMIN_USERNAME")
         self.service_user_pass = os.getenv("SUPERSET_ADMIN_PASSWORD")
         self.superset_ui_url = os.getenv("SUPERSET_UI_URL")

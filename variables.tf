@@ -101,10 +101,22 @@ variable "superset_secret_key" {
   sensitive   = true
 }
 
-variable "superset_ui_url" {
-  description = "Superset UI URL"
-  type        = string
-  default     = "http://localhost:3000"
+variable "superset_container_name" {
+  description = "Superset container name and host name in the Docker network"
+  type = string
+  default = "superset"
+}
+
+variable "superset_internal_port" {
+  description = "Superset internal port"
+  type        = number
+  default     = 8088
+}
+
+variable "superset_external_port" {
+  description = "Superset external port"
+  type        = number
+  default     = 3000
 }
 
 # BOT
@@ -118,7 +130,7 @@ variable "telegram_bot_token" {
   description = "Telegram Bot Token from @BotFather"
   type        = string
   sensitive   = true
-  
+
   validation {
     condition     = length(var.telegram_bot_token) > 0
     error_message = "Telegram bot token is required."
