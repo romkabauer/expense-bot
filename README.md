@@ -13,8 +13,7 @@
 
 💸[Start using Expense Bot](https://t.me/superset_expense_bot) 💸
 
-- 📤 Open [link to bot](https://t.me/superset_expense_bot) and send him '/start' then '/setup', it configs bot for you with initial settings values
-- 📲 Run '/add' to add your first expense, follow instructions by bot
+- 📲 Just type/voice your expense in the bot chat OR run '/add' to add your first expense following bot's instructions
 - 🎉 Congrats, you recorded your first expense with Expense Bot!
 
 ## Which currencies bot supports?
@@ -32,68 +31,36 @@ Despite used currency rate provider supports wide range of currencies, I limit a
   - 📝 Set your own templates for amounts/comments for each spending category
   - 🏷️ Adjust categories displaying in '/add' command
   - ⚡️ Add shortcuts for repeatable expenses accessible via '/shortcut' command afterward
+  - 🗓️ Schedule weekly expense report to track difference with previous week by category
 
 💸[Start using Expense Bot](https://t.me/superset_expense_bot) 💸
 
 ## How to deploy your own bot?
 
+### Prerequisites
+- Terraform >= 1.0.0
+- Docker >= 24.0.0
+- Docker Engine if you are on MacOS (for example, colima)
+
 ### Local deploy
 - Fork this repo and make your adjustments
-- Deploy using docker-compose.yaml example from repo or the example script below
+- Deploy via
 ```bash
-#!/bin/bash
-
-cd expense-bot
-docker rm -f db && docker rm -f bi && docker rm -f bot \
-&& docker build -t expense-bot-db:0.1.0  -f database/Dockerfile . \
-&& docker build -t expense-bot-bi:0.1.0 -f superset/Dockerfile . \
-&& docker build -t expense-bot:0.1.0 -f Dockerfile . \
-&& docker network rm -f expense-bot \
-&& docker network create expense-bot \
-&& export POSTGRES_USER=sample_pg_user \
-        POSTGRES_PASSWORD='sample_pg_pass' \
-        SUPERSET_SECRET_KEY=secret_string_for_encription \
-        SUPERSET_ADMIN_USERNAME=superset_admin_user \
-        SUPERSET_ADMIN_PASSWORD='superset_admin_user_pass' \
-        EXPENSE_BOT_TOKEN='your telegram bot token' \
-        EXPENSE_BOT_DB_CONNECTION_STRING='postgresql://sample_pg_user:sample_pg_pass@db/expense_bot'\
-        SUPERSET_UI_URL='http://localhost:8088' \
-        FREECURRENCYAPI_API_KEY='your_token' \
-&& docker run --name db -p 5432:5432 \
-        -e POSTGRES_USER=$POSTGRES_USER \
-        -e POSTGRES_PASSWORD=$POSTGRES_PASSWORD \
-        -v local_pgdata:/var/lib/postgresql/data \
-        --network expense-bot \
-        -d expense-bot-db:0.1.0 \
-&& docker run --name bi -p 8088:8088 \
-        -e SUPERSET_SECRET_KEY=$SUPERSET_SECRET_KEY \
-        -e POSTGRES_USER=$POSTGRES_USER \
-        -e POSTGRES_PASSWORD=$POSTGRES_PASSWORD \
-        -e SUPERSET_ADMIN_USERNAME=$SUPERSET_ADMIN_USERNAME \
-        -e SUPERSET_ADMIN_PASSWORD=$SUPERSET_ADMIN_PASSWORD \
-        -v superset-data:/app/superset_home \
-        --network expense-bot \
-        -d expense-bot-bi:0.1.0 \
-&& docker run --name bot \
-        -e EXPENSE_BOT_TOKEN=$EXPENSE_BOT_TOKEN \
-        -e EXPENSE_BOT_DB_CONNECTION_STRING=$EXPENSE_BOT_DB_CONNECTION_STRING \
-        -e SUPERSET_ADMIN_USERNAME=$SUPERSET_ADMIN_USERNAME \
-        -e SUPERSET_ADMIN_PASSWORD=$SUPERSET_ADMIN_PASSWORD \
-        -e SUPERSET_UI_URL=$SUPERSET_UI_URL \
-        -e FREECURRENCYAPI_API_KEY \
-        --network expense-bot \
-        -d expense-bot:0.1.0
-cd ..
+terraform init
+terraform apply
 ```
 
 ### GCP deploy
 You can deploy your bot on GCP platform using Compute Engine service.
 - 🖥️ Create new instance of VM
   - Choose size (e2.micro is enough for low intensity load and it is free 🆓)
-  - Choose container optimized OS with docker >= v24.0.9 (for example, cos-stable-109-17800-147-22)
+  - Any linux dist should be fine (for example, Debian)
   - If you change port for Superset, make sure you open it in NIC firewall
-- 📥 Clone repo to your created VM
-- 🛠️ Create deploy script from example above in the same parent directory like cloned repo and run it via ```source deploy_script.sh```
+- 📥 Clone repo to your created VM and run
+```bash
+terraform init
+terraform apply
+```
 
 Probably, you will need some adjustments, please reach out to me via Telegram [@romka_bauer](https://t.me/romka_bauer), I will try to help.
 
@@ -103,12 +70,8 @@ Probably, you will need some adjustments, please reach out to me via Telegram [@
 - Every BI user created has its own RLS (Row-Level Security) policy which configured to display only this BI user's expenses in Apache Superset. More about RLS: https://superset.apache.org/docs/security/#row-level-security
 
 ## Future plans:
-- Weekly summary on schedule
 - Family/Joint expenses in groups + shared access to BI for the group
 - Suggestion of new categories with ability for moderation by admins
-
-### Deployment
-- Configure env vars and deploy via Terraform
 
 ### Security
 - Use static DNS name and https for BI interface
