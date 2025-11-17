@@ -1,3 +1,7 @@
+resource "docker_volume" "superset_data" {
+  name = "superset-data"
+}
+
 resource "docker_container" "superset" {
   name  = "superset"
   image = var.docker_image_id
@@ -9,6 +13,11 @@ resource "docker_container" "superset" {
   ports {
     internal = var.superset_internal_port
     external = var.superset_external_port
+  }
+
+  volumes {
+    volume_name    = docker_volume.superset_data.name
+    container_path = "/app/superset_home"
   }
 
   env = [
