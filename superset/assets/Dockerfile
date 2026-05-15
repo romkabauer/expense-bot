@@ -5,7 +5,6 @@ USER root
 
 RUN . /app/.venv/bin/activate && \
     uv pip install psycopg2-binary \
-    psycopg2-binary \
     openpyxl \
     Pillow
 
