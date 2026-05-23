@@ -239,7 +239,7 @@ class SetupRouterBuilder(AbstractRouterBuilder):
     ################## BI SETTINGS HANDLERS ##################
 
     async def handler_setup_analytics(self, message: types.Message):
-        superset = SupersetInterface()
+        superset = SupersetInterface(logger=self.logger)
         if not await superset.is_user_exist(message.from_user.id):
             password = await superset.create_user_with_custom_role(message.from_user.id)
             await message.answer(f"User for Superset app created.\n\n"
@@ -261,7 +261,7 @@ class SetupRouterBuilder(AbstractRouterBuilder):
         await message.delete()
 
     async def handler_reset_analytics(self, message: types.Message):
-        superset = SupersetInterface()
+        superset = SupersetInterface(logger=self.logger)
         password = await superset.reset_user(message.from_user.id)
         await message.answer(f"User for Superset app re-created.\n\n"
                              f"Superset dashboard available for you here: "

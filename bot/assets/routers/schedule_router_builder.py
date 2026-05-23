@@ -32,8 +32,9 @@ class ScheduleRouterBuilder(AbstractRouterBuilder):
                 "name": "weekly_report_",
                 "job_executable": scheduler_job_templates.job_send_message,
                 "scheduled_query": analytics_sql_templates.DEFAULT_WEEKLY_REPORT,
-                "default_cron_schedule": CronTrigger.from_crontab('30 17 * * sun')
-                # "default_cron_schedule": CronTrigger.from_crontab('*/1 * * * *')
+                "default_cron_schedule": CronTrigger.from_crontab('30 17 * * sun'),
+                # "default_cron_schedule": CronTrigger.from_crontab('*/1 * * * *'),
+                "default_dashboard_name": "Template: Weekly Report",
             }
         }
 
@@ -116,7 +117,8 @@ class ScheduleRouterBuilder(AbstractRouterBuilder):
                 kwargs={
                     "user_id": callback.from_user.id,
                     "logger": self.logger,
-                    "db": self.db
+                    "db": self.db,
+                    "dashboard_name": self.scheduled_jobs_map[callback.data].get("default_dashboard_name"),
                 }
             )
             await callback.answer(SUCCESS_SETTINGS_SET)
