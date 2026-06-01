@@ -56,7 +56,7 @@ class AIRouterBuilder(AbstractRouterBuilder):
             users_comments = await UsersPropertiesDbUtils(self.db, self.logger) \
                 .get_user_property(user_id, UserProperty.COMMENTS)
 
-            ai_response = await GeminiAIProvider(AIModel.GEMINI_2_FLASH).ask_about_file(
+            ai_response = await GeminiAIProvider(AIModel.GEMINI_FLASH_LITE_LATEST).ask_about_file(
                 destination,
                 PromptTemplateExpenseFromFreeInput({
                     "${today}": dt.now().date().isoformat(),
@@ -82,7 +82,7 @@ class AIRouterBuilder(AbstractRouterBuilder):
         users_comments = await UsersPropertiesDbUtils(self.db, self.logger) \
                 .get_user_property(user_id, UserProperty.COMMENTS)
 
-        ai_response = await GeminiAIProvider(AIModel.GEMINI_2_FLASH).ask(
+        ai_response = await GeminiAIProvider(AIModel.GEMINI_FLASH_LITE_LATEST).ask(
             PromptTemplateExpenseFromFreeInput({
                 "${today}": dt.now().date().isoformat(),
                 "${user_comments}": str(users_comments),
